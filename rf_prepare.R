@@ -31,6 +31,10 @@ house$total_bedrooms[is.na(house$total_bedrooms)] = median(house$total_bedrooms,
 #The code replaces missing values in the total_bedrooms column 
 #with the median of the column where the missing values are not considered in the median calculation 
 
+##
+#or just omit the Nas 
+#house= na.omit(house)
+
 
 #first glimpse of the values of the data
 summary(house)
