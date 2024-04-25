@@ -1,0 +1,197 @@
+\documentclass[12pt]{article}
+
+\usepackage[a4paper, left=2.5cm, top=2.5cm, right=2.5cm, bottom=2cm]{geometry}
+\usepackage{setspace}
+\usepackage{booktabs}
+\usepackage{hyperref} % For hyperlinks
+\usepackage{graphicx} % For images
+\usepackage{tabularx} % For flexible-width columns
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+\begin{document}
+\section{The variable framework}
+The real estate sector is a fundamental component of the global economy, serving as both a barometer for economic health and a catalyst for economic growth. Fluctuations in housing prices have extensive implications, influencing macroeconomic policy, individual investment decisions, and government housing strategies. Given its importance, a profound understanding of the housing market's dynamics is indispensable for investors, policymakers, and the general public.
+This thesis aims to elucidate the dynamics of the housing market by leveraging advanced machine learning techniques. Specifically, I will employ a Random Forest model to analyze the California Housing dataset, which is derived from the 1990 California census and is publicly available on Kaggle. This dataset is particularly apt for this study due to its blend of simplicity and complexity, offering a detailed perspective on diverse factors influencing California’s housing markets, including geographic location (longitude and latitude), housing age, size (total rooms and bedrooms), occupancy (population and households), economic status (median income), property value (median house value), and proximity to the ocean.
+To enhance the model's utility and interpretability, I will integrate feature importance measures, specifically Permutation Feature Importance and SHAP (SHapley Additive exPlanations). 
+These methods will not only help in highlighting the interpretability of the predictions made by the model but also in identifying the most impactful features. This dual approach aims to improve prediction accuracy and provide insights into which variables most significantly influence housing prices in the region.
+
+
+
+
+
+
+
+
+
+\textbf{The use of the Random Forest model is particularly fitting due to its robustness and its capability to process diverse datasets efficiently, thereby enhancing the understanding of feature importance and improving predictive accuracy.}
+
+\subsection{Feature engineering}
+The initial House Price dataset contains 20640 observations and then 10 features where one of them will be the the target feature which in this case will be the Median value of homes measured in (USD).
+A first glance at the dataset revealed the presence of missing entries, particularly in the $total\_bedrooms$ variable, where 207 values were absent
+Despites the Random Forest algorithm's inherent capability to manage missing values for instance segregating them into distinct nodes or employing surrogate splitsan alternative imputation method was selected to ensure that valuable information across the dataset is retained.
+The choice of median for imputation was driven by its robustness against outliers, which is a critical consideration in real estate data that can often exhibit significant skewness due to extreme values.
+
+
+\subsection{Binary variable Ocean Proximity}
+Special attention was given to the categorical variable $ocean\_proximity$.  To handle its unique challenges in a predominantly numeric model, it was isolated and then transformed through one-hot encoding, which creates a separate binary indicator for each category.
+This transformation enhances model interpretability, particularly useful for applying SHAP (SHapley Additive exPlanations) and Permutation Feature Importance. These methods benefit from one-hot encoding as it allows for a clearer attribution of prediction impacts and a more detailed evaluation of each category's influence on the model's predictions.
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.8\textwidth]{ocean_prox.png}
+	\caption{Frequency of Categories in Ocean Proximity}
+	\label{fig:oceanprox}
+\end{figure}
+The bar plot clearly indicates a significant preference for residences located less than one hour from the ocean, boasting the highest number of observations at 9,136. Following that, 'Inland' regions account for 6,551 observations, suggesting a notable but lesser concentration of properties. Interestingly, the category 'Island' has an extremely low presence in the dataset. Overall, the data depicts a discernible inclination towards ocean-adjacent living, compared to inland areas.
+
+
+\subsection{Distribution of numerical variables}
+To examine the distributions and frequencies of the remaining nine numerical variables, we will now employ histograms.
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.8\textwidth]{distributions_num.png}
+	\caption{Frequency of Categories in Ocean Proximity}
+	\label{fig:distributions}
+\end{figure}
+The histograms reveal a pronounced right skew in several variables, such as total rooms, total bedrooms, population, households, and median income, indicating a concentration of lower values with a long tail of higher values. The target variable, median house value, also exhibits a right skew but with a notable cluster of high-value properties, suggesting the presence of a luxury housing segment. Additionally, the distribution of housing median age shows a collection of very old houses, which may represent historical or less-renovated properties, further characterizing the diverse nature of the dataset's housing inventory.
+Moreover, the histograms for longitude and latitude reveal concentrated bands of high frequency, reflecting the geographical clustering of properties and possibly indicating areas of higher population density or urban development. These patterns could be emblematic of the state's major urban areas, and such geographical insights might be critical when considering regional planning and development policies.
+
+\subsection{Correlation analysis}
+In light of the skewed distributions and the presence of outliers within the dataset, I will utilize Spearman's rank correlation coefficient to assess the relationships between variables. This non-parametric measure is more suitable for our analysis as it can capture monotonic relationships without the assumption of linearity, providing a more robust understanding of the underlying associations in preparation for Random Forest modeling.
+\textbf{For interpretative and exploratory analysis, Spearman might give you more insights into how variables are associated with each other in the context of your skewed data. But ultimately, for feature selection or understanding the underlying structure in the context of Random Forest modeling, neither correlation coefficient will have much impact. The model itself will determine the importance of features through its own internal algorithms, which is why you're planning to use SHAP analysis later on.
+So, while Spearman might be more informative for your initial exploratory analysis given your dataset's characteristics, it won't have a bearing on the effectiveness of your Random Forest model.}
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.8\textwidth]{spearman_one.png}
+	\caption{Frequency of Categories in Ocean Proximity}
+	\label{fig:corr_one}
+\end{figure}
+
+The correlation matrix indicates several strong relationships among the variables. Longitude and latitude have a very high negative correlation, suggesting that as we move in one geographic direction, there’s a corresponding and predictable move in the other, likely tracing a geographic contour such as coastlines. High positive correlations are observed among $total\_rooms$, $total\_bedrooms$, $population$, and $households$, indicating that these variables increase together, which is expected as larger dwellings can typically accommodate more people.
+Notably, $median\_income$ shows a significant positive correlation with $median\_house\_value$, reinforcing the economic principle that higher income levels are associated with more expensive housing. These strong correlations provide valuable insights into the factors that might predict housing prices and warrant further investigation in predictive modeling.
+Besides the $median\_income$ feature, no other feature exhibits a string direct correlation with our target variable $median\_house\_value$.
+
+\subsection{feature engineering}
+In addressing multicollinearity and enhancing model interpretability, the study introduces feature engineering to create new variables representing average population, bedrooms, and rooms per household. This transformation aims to mitigate the high correlations observed among $total\_rooms$, $total\_bedrooms$, $population$, and $households$ which could complicate the SHAP interpretation and permutation feature importance. The implications of strong correlations among features for permutation feature importance and SHAP analyses will be explored in depth in a subsequent chapter, where we'll discuss how these interdependencies can affect model explanation and variable significance.
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.8\textwidth]{spearman_two.png}
+	\caption{Frequency of Categories in Ocean Proximity}
+	\label{fig:corr_two}
+\end{figure}
+The feature engineering implemented has successfully addressed the issue of high correlations among certain variables. By creating new features—mean population per household, mean bedrooms per household, and mean rooms per household—we see a significant reduction in the correlations, as evidenced in the updated Spearman correlation matrix. Notably, the correlation between the original room-related variables and the household size has diminished, aligning the dataset for a more nuanced analysis and interpretation in later stages, particularly when assessing feature importance with SHAP and permutation methods.
+Notably we still encounter a correlation between $median\_house\_value$ and the $median\_income$ feature, suggesting that as median income increases, the median house value tends to increase as well; this is a key insight for predicting house values. Moreover, emergent correlation (0.64) between mean rooms and median income could be indicative of an underlying pattern where higher income areas tend to have houses with more rooms, reflecting socio-economic factors influencing housing characteristics. This finding suggests that median income serves not only as a proxy for the economic status of the inhabitants but also aligns with larger living spaces. 
+
+\subsection{Scatter plots}
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.8\textwidth]{income_rooms.png}
+	\caption{Scatterplot between median income and mean rooms}
+	\label{fig:income_rooms}
+\end{figure}
+\textbf{Income and rooms:} The scatter plot reveals a concentration of data points towards the lower end of median income, with a relatively steady number of mean rooms, suggesting that for a large segment of the dataset, the number of rooms does not vary significantly with income. However, there is a less dense, upward trend for higher median incomes, which indicates that households with higher incomes tend to have a greater number of rooms. The presence of outliers, particularly those with a high number of mean rooms but lower median incomes, hints at the complexity of the relationship and suggests that factors other than income may also significantly influence the number of rooms in a house.
+The Spearmna correlation coeficient that suggest a moderate postiv monotonic correlation (0.64) . is supported by the upward trend observed in the scatter plot among higher-income households. However, the dense clustering of data points at lower income levels with a consistent mean number of rooms indicates that the relationship is not strictly linear but rather increases more noticeably at the upper end of the income scale.\\
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.8\textwidth]{median_income.png}
+	\caption{Scatter plot between median income and house prices}
+	\label{fig:income_housevalues}
+\end{figure}
+\textbf{Income and House values}: This scatter plot demonstrates a clear positive trend, indicating that median house values tend to increase with rising median incomes, which corresponds to the previously noted Spearman correlation. he data points are densely packed at the lower end of the income scale, forming a broad upward spread as income increases, showing greater variability in house values at higher income levels. This visualization supports the hypothesis that median income is a significant predictor of housing value, yet it also suggests a potential ceiling effect or price cap on the median house value, beyond which increases in income do not correspond to higher house values, as seen by the horizontal line of data points at the top of the plot.
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.8\textwidth]{long_lat.png}
+	\caption{Scatter plot between longitude and latitude}
+	\label{fig:long_lat}
+\end{figure}
+\textbf{Longitude and Latitude: }The scatter plot exhibits a distinct geographic clustering of properties, reflecting population density and urban development patterns within the region under study. Dense clusters along specific longitudes and latitudes likely denote major urban centers, while sparser regions suggest rural or less developed locales. 
+The scatter plot of longitude and latitude also intimates a negative relationship between these coordinates and property locations, suggesting that as we move westward or northward (indicated by decreasing longitude or increasing latitude), we encounter different housing patterns. This negative correlation could imply that properties situated further west or north within the study area tend to be located in distinct environmental or economic contexts, possibly less dense or affluent areas compared to those in the east or south. Such a trend would necessitate a comprehensive analysis to understand the underlying factors—be they environmental, economic, or social—that drive this geographic distribution of housing values.
+
+\subsection{What does the summary tell us}:
+\begin{itemize}
+\item \textbf{Diversity in the Household size: }The household sizes range widely from a minimum of 1 to a maximum of 6082, with a mean significantly higher than the median. This indicates a right-skewed distribution, suggesting that while most districts have a moderate number of households, a few districts are highly populated. This might influence utility infrastructure and services, possibly affecting housing prices.
+\item \textbf{Older vs newer households: } The 'housing median age' variable might provide insights into the real estate market's dynamics, such as newer versus older neighborhoods. Older districts might have either higher historical value or might require more maintenance, affecting their market value.
+\item \textbf{Economic factors: }  The 'median income' variable is critical for predicting housing prices. Higher income could correlate with higher housing prices. The range from 0.5 to 15 suggests varying economic conditions across districts, which could be a primary driver of housing market behaviors.
+\item \textbf{The density metrics: } : These engineered features give insights into the living conditions. For example, the 'mean rooms' ranges from about 0.85 to 141.91, indicating significant variability in room availability per household across districts. Such features can help understand how density impacts housing prices. For instance, areas with more rooms per household might be more desirable, reflecting in higher house values.
+\item \textbf{Outliers: } Some values, like a maximum mean population of 1243.3333 per household and 34.0667 bedrooms per household, appear exceptionally high and might be outliers or data errors. These should be investigated as they can skew analysis and model performance.
+
+\end{itemize}
+
+\section{Model results:}
+\begin{itemize}
+\item Number of Trees: The model was built with 500 trees, which is generally sufficient to provide a stable prediction with less variance. The large number of trees helps in averaging predictions to improve the model's generalizability.
+\item Out-of-Bag (OOB) Prediction Error (MSE): The MSE (Mean Squared Error) for the out-of-bag predictions is approximately 4,740,684,814. 
+\item The R-squared value is about 0.643, which indicates that approximately 64\% of the variance in the median house values can be explained by the predictors included in the model. This is a moderately strong score, suggesting that the model captures a significant portion of the complexity in the dataset but also indicating room for improvement.
+\item Exploring Model Complexity: Increasing the max.depth might capture more complex interactions between variables but could risk overfitting. Cross-validation could be used to find an optimal balance.
+\end{itemize}
+\subsection{feature importance}
+\begin{itemize}
+\item 1. median income        5792738766
+\item 2. inland               3208511224
+\item 3. mean rooms           1239465048
+\item 4. mean pop             987024516
+\item 5. latitude             779630473
+\item 6. longitude            660844575
+\item 7. lessoneocean         477694608
+\item 8. nearBay              64300635
+\item 9. nearocean            77176267
+\item 10. housing median age  212349220
+\item 11. mean bedrooms       32770296       
+\item 12. households          11196721
+\item 13. island              0
+\end{itemize}
+
+\subsection{Performance on test set}
+\textbf{Value : 69,401.65}. RMSE measures the standard deviation of the residuals (prediction errors). Residuals are a measure of how far from the regression line data points are, and RMSE is a measure of how spread out these residuals are. In other words, it tells you how concentrated the data is around the line of best fit. A lower RMSE is better as it indicates a closer fit of the model to the data.Whether 69,401.65 is a good or bad value depends on the context, specifically the scale of the median house values in your dataset. If the typical house values are in the hundreds of thousands, this RMSE might be considered reasonable. 
+\textbf{WHat about the MAE: 50,907.82}: This number means that on average, the predictions of the median house values by your model are off by approximately \$50,907.82 from the actual values. The significance of this MAE value largely depends on the range and scale of the median house values in your dataset. For instance:
+If the median house values typically range around \$500,000, an MAE of \$50,907 might be seen as relatively reasonable (about 10\% error).
+
+\subsection{Improved model after SHAP analysis}
+After removing the features "island", "households", and "mean bedrooms", the random forest model trained with 500 trees on 10 variables exhibited an improved out-of-bag R squared of 0.6595, suggesting that approximately 65.95\% of the variability in median house values is explained by the model. The out-of-bag prediction error, measured by MSE, decreased to 4,517,347,039, reflecting a tighter fit to the data. The model simplification led to a reduced RMSE of 67,886.62, indicating that the predictive accuracy has been enhanced by focusing on more impactful variables.
+The reduction in RMSE from 69,401.65 to 67,886.62 after removing the features ("island", "households", "mean bedrooms") suggests that these features were not providing useful signals for predicting the median house values. In other words, they may have introduced some noise or redundancy into the model, which, when removed, allowed the model to make more accurate predictions. In this case removing the feature space lead to a simpler, more generalizable model. As the removed features were not contributing to predictive accuracy, their absence may prevent the model from fitting to random noise in the training data.
+
+\subsection{Second model after SHAP}
+We now removed the features "island", "households" "mean bedrooms", "nearbay and "nearocean", and the random forest traned with 500 trees on 10 variables exhibited an improved out of Bag R squared of 0.669 suggesting that approyimately  66.9\% of the variability in median house values is explained by the model. The out-of-bag prediction error, measured by MSE, decreased to 4392289083 reflecting a tighter fit to the data. The model simplification led to a reduced RMSE of 67171.32 indicating that the predictive accuracy has been enhanced by focusing on more impactful variables. The reduction in RMSE from  67,886.62  to  67,171.32 after removing the features ("island", "households", "mean bedrooms","nearocean","nearbay") suggests that these features were not providing useful signals for predicting the median house values. In other words, they may have introduced some noise or redundancy into the model, which, when removed, allowed the model to make more accurate predictions. In this case removing the feature space lead to a simpler, more generalizable model. As the removed features were not contributing to predictive accuracy, their absence may prevent the model from fitting to random noise in the training data.
+
+\section{Irrelevant Features}
+The last five features ('nearocean', 'nearBay', 'mean bedrooms', 'households', and 'island') have relatively low SHAP values, suggesting that they contribute less to the model's predictions.
+We can remove the last variables and imporve the model accruacy as These variables might have introduced noise rather than useful signals, thus their removal led to a cleaner model that can focus on more impactful features. Or y eliminating these features, you may have reduced the complexity of the model, preventing it from overfitting to the training data and thus improving its performance on unseen data.\\
+\textbf{What if we take a look at the Beeswarm plot}
+The features at the bottom ('nearocean', 'nearBay', 'mean bedrooms', 'households', and 'island') have SHAP values clustering around zero, indicating their impact on the model's output is negligible compared to other features. They also have a less pronounced spread, which could mean their values do not vary much across data points or simply do not affect the outcome significantly.\\
+\textbf{SHAP dependence of island:} Almost all of the SHAP values for 'island' are close to zero, suggesting that whether a property is on an island or not doesn’t significantly impact the model's predictions of house prices.
+ Since there are so few instances with 'island' equal to 1, this feature lacks variation, which is crucial for learning. A feature that is almost constant cannot provide much information gain.
+
+
+\section{Abstract}
+\subsection{Normalization of three variables}
+In the process of preparing the dataset for predictive modeling in this thesis, significant emphasis was placed on transforming raw data to enhance both the model's accuracy and its interpretability. Transformations were applied to create new variables $mean\_pop$(average population per household), $mean\_bedrooms$ (average number of bedrooms per household), $mean\_rooms$ (average number of rooms per household). Thse derived variables serve multiple strategic purposes. Mainly, these transformations help reduce multicollinearity, a common issue in datasets where large counts (like $total\_rooms$ and $total\_bedrooms$) are related. By converting these counts to averages per household, the new features provide a clearer, more independent representation of the data's structure, enhancing the interpretability and reliability of the model's predictions. Moreover, the granularity offered by these per-household metrics aligns closely with the model's objective to achieve high prediction accuracy. By focusing on household-specific factors rather than aggregated totals, the model can more adeptly capture subtle patterns that affect housing prices, thereby improving its predictive performance.
+In conclusion, the engineering of these average-based features is meticulously designed to support the thesis' goals of developing a highly accurate and interpretable predictive model. This strategic choice not only facilitates a deeper understanding of the housing market dynamics but also ensures that the model's findings are robust and grounded in sound statistical reasoning.
+
+
+\subsection{Correlations}
+\begin{itemize}
+\item \textbf{Pearson correlation:} his is typically used for continuous variables that have a linear relationship and are approximately normally distributed. It measures the strength and direction of the linear relationship between two continuous variables.
+\item \textbf{Spearman's rank correlation:} Useful for ordinal variables or continuous variables that do not necessarily have a normal distribution. It is a non-parametric measure of rank correlation, assessing how well the relationship between two variables can be described using a monotonic function.
+\end{itemize}
+What about normal distributions with the Quantile quantile plot
+\begin{itemize}
+	\item \textbf{left-skewed} If the points form a curve that is concave upward, the data have a lighter tail than the normal distribution 
+	\item \textbf{right-skewed} If the points form a concave downward curve, the data have a heavier tail than the normal distribution 
+	\item \textbf{Right:} In a Q-Q plot, data points are plotted against the expected values from the normal distribution. If the data are normally distributed, the points will fall approximately along a straight line (though some deviation is expected at the tails).
+\end{itemize}
+Example population:Is right skewed also so bisschen nach rechts verschoben. The histogram shows a large frequency of data points near the origin (left side of the histogram), and the frequency decreases as the value increases. There is a long tail that stretches to the right, but with very low frequency. This indicates that the majority of the population values are small, and a small number of population values are much larger, which is characteristic of a right-skewed distribution.
+The QQ plot shows that the data points follow the theoretical line closely at the lower end (left side) but start to deviate upwards as we move to the right. This upward deviation at the higher end (right side) of the QQ plot indicates that the upper quantiles of the data are larger than the upper quantiles of the normal distribution, which is a sign of right skewness.
+
+\section{Explanations}
+\subsection{Scatter plot horizontal line}
+The horizontal line of data points at the upper part of the scatter plot suggests that there's a maximum limit or threshold for the median house value in the dataset. No matter how much the median income increases past a certain point, the median house value does not continue to rise correspondingly.
+For example, let’s say the threshold is at \$500,000 for the median house value. Households with a median income of \$100,000 and those with \$150,000 might both have houses valued around this threshold, indicating that factors other than income are capping the house values, like market saturation, zoning laws, or a limit to what buyers are willing to pay in that area, regardless of their income.
+
+
+
+
+
+
+
+
+\end{document}

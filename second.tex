@@ -1,0 +1,399 @@
+\documentclass[12pt]{article}
+
+\usepackage[a4paper, left=2.5cm, top=2.5cm, right=2.5cm, bottom=2cm]{geometry}
+\usepackage{setspace}
+\usepackage{booktabs}
+\usepackage{hyperref} % For hyperlinks
+\usepackage{graphicx} % For images
+\usepackage{tabularx} % For flexible-width columns
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+
+\begin{document}
+\clearpage % or \bigskip, depending on your preference
+\begingroup
+\fontsize{10pt}{12pt}\selectfont
+\setstretch{1.1}
+
+\begin{abstract}
+Recent advancements in machine learning, particularly in ensemble tree models such as random forests, have markedly advanced predictive analytics. However, the complexity of such models often hinders their understanding and interpretability, posing a substantial barrier to their practical application in real world scenarios. 
+This study adresses these concerns by exploring the application of SHAP (Shapley Additive exPlanations) a method grounded in the principles of cooperative game theory.
+By utilizing the California House Price Dataset, this research assesses feature importance within a random forest model, emphasizing a predictive regression task. 
+Our approach is dual-faceted: we aim to not only enhance the interpretability of complex machine learning models but also to refine the accuracy of their predictions. 
+To this end, we introduce the model-agnostic approach using Kernel SHAP and extensively apply the TreeSHAP method, specifically designed for tree-based models.
+Our findings reveal that TreeSHAP not only improves the interpretability of complex machine learning models but also facilitates a more transparent understanding of their outputs.
+This advancement is crucial, especially in domains where clarity and trust in model predictions are vital. 
+\end{abstract}
+\endgroup
+\newpage
+\setstretch{1.5}
+\section{Introduction}
+In todays era machine learning -a dynamic field that intergrates and unifies computer science, statistics and information theory for predictions based on data, is rapidly growing and becoming integral to our daily lives. % the power of trees 
+In this context, tree based machine learning models, such as random forests or gradient boosted tree models, with their innate ability to learn from data and improve over time, have transformed problem solving across numerous domains.
+Their unparalleled versatility and adaptability, for instance when it comes to handling nonlinear data and effortlessly managing heterogeneous data types (both numerical and categorical), have significantly minimized human error and enhanced efficiency across numerous fields. %black box models
+However, their complexity often results in a ”black box” phenomenon, where the rationale behind decisions remains obscure.
+  This lack of transparency challenges our understanding of model predictions, the importance of features, and their overall influence on outcomes.
+ The absence of clear explanations can pose significant risks; without transparent explanations, individuals might draw their own, potentially incorrect, conclusions about how these models make predictions. Furthermore, it could hinder researchers and developers from examining and debugging algorithms effectively, which could lead to the deployment of biased models.
+Therefore, the challenge today lies not just in developing advanced and accurate algorithms, but also in ensuring that these algorithms' outcomes are interpretable and accessible to humans.
+ This lack of transparency in complex models presents individulas with a crucial dilemma: choosing simpler models for detailed insights into the models’ predictive mechanisms or accepting robust and accurate performance without understanding the underlying logic. \cite{molnar2022}
+This trade-off is particularly crucial in sectors with significant consequences, such as finance, healthcare, and criminal justice.
+For instance, in finance understanding feature importance in credit scoring and fraud detection is critical for ensuring transparent and fair decision-making \cite{KVAMME2018207}.
+ In healthcare, insights into feature values that influence predictions are vital, not only for diagnosing diseases but also for identifying contributing factors essential in developing personalized treatment plans \cite{Elish2020ASO}.
+ Furtheremore, in critical areas like criminal justice and environmental science, interpreting model contributions to decision-making can aid in identifying and mitigating biases, fostering trust in models designed to have long-term impacts on society and the planet.\\
+ Moreover, model interpretability often is strongly connected to model selection, directly impacting performance outcomes.
+In various industries the lack of interpretability of complex models  might enable stakeholders to favor simpler alternatives, which may not completly capture inherent dependencies and interactions in the data.
+As a consequence this can lead to a significant oversight of the data structure ending up in a diminished prediction accuracy. \\
+In response to those challenges, specialized fields such as Explainable Artificial Intelligence (XAI) and Interpretable Machine learning (IML) have emerged.
+These disciplines are dedicated to developing frameworks that demystify complex models, making them more accessible. 
+The existing research that specialized in interpreting complex models can be distinguished between global and local interpretability \cite{molnar2022}. \textbf{Global interpretability referes to the ability to undertsand the overall behaviour of a model across all instances. On the other hand, local interpretability focuses on explaining the decission-making process for individual predictions, providing insight into the reasoning behind specific model outputs. }
+For tree ensemble models like random forest, two mehtods that have been frequently used to inteprete models on a gloabl scale are permutation feature importance \cite{article} and partial dependence plots \cite{4a848dd1-54e3-3c3c-83c3-04977ded2e71}. 
+While those approaches provide valuable insights at a global level, they often fall short in explaining individual predicitons.
+Similarly, model agnostic methods such as LIME \cite{10.1145/2939672.2939778} and Explanation vectors, although effective in local interpretability, may not fully capture the comprehensive behaviour of complex models, especially when it comes to understanding the contribution of each feature across all instances.
+ This highlights the need for a framework that bridges the gap between local and global understanding while beeing adaptable across various model architectures. 
+In response, SHAP (SHapley Additive exPlanations), a method leveraged from the Shapley values concept of cooperative game theory emerged as a powerfull tool to interprete machine learning models both on a local and a global scale. 
+Shapley Values introduced by Lloyd Shapley in 1953 offer a fair solution in cooperative game theorie when adressing the issue of fairly distributing a payout among participants who have contributed differently to the payout.
+What distinguishes Shapley values from other methods is their foundation on four core axioms that ensure a fair distribution. These principles guarantee that the contribution of each feature to a model's prediction is allocated justly, mirroring the fair payout distribution among players in a game. 
+The initial proposal to adapt Shapley values for interpreting machine learning predictions by detailing feature contributions was made in 2010 \cite{article2} and then further refined in 2014 \cite{article3}.
+This pioneering work integrated cooperative game theory into machine learning interpretability.
+However, the practical application of these concepts was limited due to the lack of accessible implementation and the computational intensity of the methods. 
+A significant advancement occurred with Lundberg and Lee's work \cite{10.5555/3295222.3295230} , which propelled Shapley Additive exPlanations (SHAP) into the spotlight.
+ In SHAP the authors found a new model agnostic approach with the Kernel SHAP algorithm, inspired by \cite{10.1145/2939672.2939778}, which employs weighted linear regression with a kernel function to optimize data point weighting.  and DeepLIFT designed for deep learning models, addressed the computational hurdles previously encountered.
+Additionally, their use of DeepLIFT, specifically tailored for deep learning models, addressed previous computational challenges. These developments marked a pivotal moment, offering practical, model-agnostic tools that broadened the accessibility and applicability of Shapley values in the field.
+We will later explore KernelSHAP in detail, particularly its strategy of sampling predictions from marginal contributions, which, while efficient, may introduce inaccuracies when features are correlated but assumed to be independent.
+In 2020, the development of SHAP advanced significantly with the introduction of TreeSHAP, a model-specific method tailored for explaining tree-based and ensemble tree models locally  \cite{unknown}. 
+This algorithm makes it feasible to provide rapid and detailed explanations by using conditional expectations rather than marginal distribution sampling and achieves polynomial time complexity, enabling fast and precise explanations for these popular models \cite{lundberg2019consistent}.\\
+In this paper, I will be using a random forest model to predict house prices using the California Housing Prices dataset from Kaggle and featured in Aurélien Géron's book "Hands-On Machine Learning with Scikit-Learn, Keras, and TensorFlow."
+Tree based ensemble models are renowed for their accuracy in handling tabular data \cite{Chen_2016} \cite{grinsztajn2022treebased} \cite{lundberg2019explainable};however, pose challenges in terms of interpretability, especially at the local level.
+ Heuristic mehods such as the Saabas method have proven inconsistent in explaining predictions from tree-based ensemble models \cite{lundberg2019consistent}.
+To address these interpretability challenges, I will utilize the TreeSHAP algorithm, which is designed to enhance understanding of feature importance using SHAP dependency and summary plots. These tools will aid in uncovering general and potentially hidden patterns within the data.
+Additionally, this analysis will not only enhance model interpretability but also aim to improve prediction accuracy. I will explore whether insights derived from TreeSHAP's SHAP value importance plots can guide feature selection and thereby potentially enhance the performance of the random forest model.
+TreeSHAP, available in the R TreeSHAP package, is favored for its consistency and computational efficiency, which are critical given the dataset's complexity—featuring 14 variables and over 20,000 observations. Despite its advantages, I will also discuss some limitations associated with the use of conditional expectations within TreeSHAP that could affect the reliability of the algorithm.\\
+For the following the paper is structure as follows. In the next section I will be introducing the random forest model and the mechanism behind the splitting process in a decission tree and the bagging process which uplifts random forest models from other methods such as regular classification and regression trees. In section tree I will be shortly introducing model agnostic tools that yet can be used to interprete models on a global scale and there underscore their disadvantages to then introduces the SHAP value concept in section 4. In section 5 I will be buildding my model and showing the results of my SHAP analysis by visualising them through plots. In section 6 I then will be showing how the SHAP analysis achieved to improve my models when it comes to their prediction accuracy. 
+
+\section{Tree based models}
+In optimizing prediction accuracy with tabular data, tree-based models like random forests and boosted trees often surpass more complex Deep Learning methods, such as neural networks such as Neural Networks \cite{Chen_2016} \cite{grinsztajn2022treebased}.
+\textbf{At the heart of these tree based models lies the decission tree. renowned for its ability to model nonlinear relationships and automatically handle non-numerical features}. Decision trees operate by dividing the feature space into distinct regions through a series of binary decisions, each based on a single feature's value. This process creates a path from the root to the terminal nodes, each representing a specific outcome or prediction for instances falling within that region.For this study, we focus on regression trees since we are predicting a continuous variable—median house prices. 
+Compared to ensemble methods, single regression trees are simpler to interpret and visualize, making them more accessible to non-experts. In the following section, we will delve into the formalization of the splitting process in a regression tree.
+\subsection{The single regression tree}
+The process of fitting a simple regression tree on training data $M=(X,Y)$, where $X$ represents a set of features $(X_1, X_2 \ldots X_J)$ and $Y$ the response variable, consists in a series of splittinng decissions that start at the root of the tree. As trees decission trees tend to be drawn upside down, the root is to be found at the top of the tree. 
+\textbf{Binary splitting proces}: During the splitting process the tree algorithm divides the predictor space, in different non overlapping regions $R_1, R_2 \ldots R_M$ based on the values of the features $X_1, X_2 \ldots X_J$. The division tries to find the Regions $R_1, R_2 \ldots R_J$ that minimize the RSS which is given by:
+ \[
+ \text{RSS} = \sum_{m=1}^{M} \sum_{i \in R_m} (y_i - \hat{y}_{R_m})^2,
+ \]
+where \(\hat{y}_{R_m}\) can be seen as the mean response for the training observations within the $m$th region. This stratification is based on a binary splitting approach which is also known as a top-down, greedy approach, as it selects the best split at each step without regard for future splits that might lead to a more optimal tree structure.
+\textbf{Selecting the best split:} In this sense, in each step the algorithm evaluates all predictors and possible splitpoints and then chooses the predictor and splitpoint that results in the lowest RSS for the resulting tree. Following the selection of a split, the algorithm then applies the same process to divide the resulting regions further, continuing this recursive partitioning until it meets a predefined stopping criterion. Common stopping criteria include  a maximum number of leaves or a minimum number of observations requiered to justify a further split. 
+Once the tree has been fully grown, for any given observation \(x\), the model's prediction is then given by:
+\[ f(x) = \sum_{m=1}^{M} c_m \cdot I(x \in R_m) \]
+where \(I(x \in R_m)\) is an indicator function that equals 1 if \(x\) belongs to region \(R_m\), and 0 otherwise and $c_m$ the mean response for the training observations within region $R_m$ (or within that region).
+Once the tree has been fully grown, predictions for new observations are made by determining the region to which they belong and then assigning the mean response of the training observations within that region.
+\subsection{Bias Variance Tradeoff}
+While decision trees are powerful models, their performance is deeply influenced by a critical concept in machine learning called the bias-variance tradeoff. 
+This trade-off explains how a model's complexity influences its performance on unseen data. 
+A model with high bias makes strong assumptions about the data's underlying structure, potentially oversimplifying the reality. This often results in missing out on important patterns, leading to errors even on the training data, a phenomenon also known as underfitting. 
+Conversely, high variance arises from a model's excessive sensitivity to the specific idiosyncrasies of the training data, leading it to capture noise as if it were a genuine pattern. This results in a model that, while potentially performing well on its training data, fails to generalize to new data.
+Decision trees exemplify this tradeoff acutely. Their structure allows them to capture complex decision paths through deep branching. However, this depth, while enabling the model to fit the training data very closely, can also lead to high variance, manifesting as overfitting. On the flip side, a shallow tree might not split enough to accurately capture the underlying patterns in the data, leading to a high-bias scenario where the model underfits, missing critical information necessary for accurate predictions.
+This instability, marked by the dichotomy between high variance and high bias, challenges the reliability of decision trees in delivering consistent predictive performance.
+To address these vulnerabilities, ensemble learning methods like Random Forests  \cite{article} are applied. They combine the predictions of multiple decision trees to create a model that balances bias and variance more effectively, leveraging the strengths of numerous trees while mitigating their individual weaknesses.
+
+\section{Random forest}
+Random Forests are an ensemble learning method that enhances the predictive performance beyond what individual decision trees can achieve by aggregating their predictions. This method leverages the strength of multiple models to reduce overfitting and improve generalization.
+This approach resonates with the Weak Law of Large Numbers (WLLN) \cite{IBE2014185}, which states that, for independent and identically distributed (i.i.d.) random variables, the sample average converges in probability towards the expected value of the distribution from which these variables are drawn. 
+Analogously, in Random Forests, each tree in the ensemble acts as an independent estimator, drawing conclusions from slightly different subsamples of the data (bootstrap sampling). As more trees are added to the forest, the collective output, averaged from all trees, tends to lead to more stable and accurate estimates of the population mean.
+However, the practical challenge in applying WLLN directly in machine learning, including in Random Forests, lies in the typical limitation of having access to only a single dataset rather than multiple large samples needed to directly observe the law's effect. 
+To overcome this, Random Forests ingeniously simulate these ideal conditions through a technique known as bootstrapping.
+This method allows for the construction of diverse training subsets by repeatedly sampling, with replacement, from the original training dataset.
+For the Random Forest model, this can be demonstrated in the following way: The bootstrap sampling method entails drawing multiple subsets $D_i$ where $i=1,\ldots,M$ with replacement from the original training dataset $D$, with each subset maintaining the same size as the original training dataset.
+For each subsample dataset $D_i$, a distinct regression tree $h_i(X)$ is trained. 
+As the subsamples are drawn with replacement $M$ different regression trees are constructed, each based on a unique subsample of the original dataset.
+The random forests final prediction $\hat{h}(X)$ is then determined by aggregating these individual predictions. Specifically, the final prediction is the average of the predictions from all $M$ trees:
+$$\hat{h}(X): \frac{1}{M} \sum_{i=1}^{M}\hat{h}_i(X)$$
+This averaging process effectively reduces the variance of the predicted values, as it averages out idiosyncrasies in individual trees’ predictions, leading to a more stable and accurate model.
+While the Weak Law of Large Numbers (WLLN) presupposes independence among random variables, the bootstrap samples, Random Forests inherently lack strict independence since they are derived from the same original dataset. 
+Consequently, in the most rigorous mathematical sense, the decision trees within a Random Forest do not achieve complete independence from each other. Nonetheless, Random Forests counteract this interdependency by introducing additional randomness in the tree-building process. Specifically, the model selects a random subset of features for each split point in the construction of trees. This strategy ensures that, even when two trees are trained on similar bootstrap samples, the randomness in selecting features for splits can lead to variations in their decision-making processes, effectively reducing correlation between them. Thus, despite the lack of strict independence, the bagging (bootstrap aggregating) method can still substantially diminish variance.
+To this end, Random Forests rely on two principal hyperparameters that influence model behavior and performance.
+ The first one, commonly referred to as $mtree$, plays a crucial role in ensuring randomized splits at each node, which, in turn, decorrelates the individual trees. 
+This process of selecting a random subset of features for determining splits at each node in the tree introduces another layer of randomness that can decrease the correlation between trees, as different trees will make decisions based on different sets of features.
+It is important that $mtry$ is set lower then than the total number of features in the dataset $mtry<<n$to maintain this effect. A guideline proposed by Breiman suggests choosing $mtry=\sqrt{n}$ where n represents the total feature count.
+The second $M$, specifies the number of trees to include in the Random Forest. Generally, increasing the number of trees enhances model robustness and accuracy up to a point. Beyond this point, however, the benefit of adding more trees diminishes, and computational costs rise, without a commensurate improvement in model performance. This saturation effect occurs because the ensemble's predictions become highly stable, and additional trees contribute little to altering the average outcome. 
+In summary, Random Forests represent a sophisticated evolution from individual regression trees by adeptly navigating the bias-variance trade-off. Whereas single trees might reduce bias at the cost of increased variance, leading to overfitting, Random Forests mitigate this risk through their ensemble approach. 
+ By aggregating the predictions of multiple trees, each built on bootstrapped samples and considering random subsets of features at each split, Random Forests significantly reduce variance without a corresponding increase in bias. This balance is crucial for developing models that not only perform well on the training data but also generalize effectively to new, unseen data.
+
+
+\subsection{OOB sample}
+Random Forest introduces a unique feature as a direct consequence of its bootstrapping process. In constructing each tree, the algorithm randomly selects observations from the original dataset with replacement to create bootstrapped subsamples. Notably, this sampling method does not guarantee the inclusion of evry observation in each subsample. On average, a little more than one-third of the observations from the original dataset are not used in any particular tree's training dataset.
+This phenomenon is quantified by evaluating the likelihood that a specific observation is omitted from a bootstrapped sample. The probability that an observation is not selected is given by:
+$$\text{OOB Probability}: P(\text{not drawn}) = (1-\frac{1}{n})^{n}\, \text{as}\, n \longrightarrow \infty = \frac{1}{e} \approx 0.37
+ $$
+ where $n$ represents the total number of observations in the original dataset and$ \frac{1}{e}$ reflects the limiting value of this probability, approximately 37\%, as the dataset size becomes infinitely large. The observations not selected for a tree’s training sample are known as the Out-Of-Bag (OOB) observations for that particular tree.
+The OOB observations are foundational to the functionality of Random Forest models, fulfilling several critical roles.  A primary function is their utilization as an unbiased internal validation set. Since OOB observations are not used in the training of specific trees within the forest, they provide a unique opportunity to assess the performance of these trees. This setup offers an unbiased estimation of the model's prediction accuracy, commonly referred to as the OOB error, without reducing the size of the training set.
+To formalize this process, consider each training point $(\textbf{x}_i,y_i) $ within the original dataset D. 
+For a given point, we identify a set $S_i = \{(k|(\textbf{x}_i,y_i)) \notin D_k\} $, where $S_i$ represents the indices of trees for which $(\textbf{x}i,y_i)$ was excluded from their bootstrapped training subsets $D_k$.  For points missing in $D_k$, the OOB predictions are computed using trees indexed in $S_i$:
+ $$h_i(\textbf{x}_i): \frac{1}{|S_i|} \sum_{k \in S_i}h_k(x_i)$$ 
+Subsequently, the OOB error $\epsilon_{OOB}$ is determined by averaging the errors across all training points, employing the OOB dataset:
+ $$\epsilon_{OOB}= \frac{1}{n}\sum_{(x_i,y_i)\in D} L(h_i(\textbf{x}_i),y_i)$$.
+ Here, $L$ denotes the loss function, measuring the discrepancy between the average OOB prediction $h_i(x_i)$ for each training sample and the corresponding actual target value $y_i$. 
+  This method effectively estimates the test error, as it leverages only those trees that did not see the particular training point during their formation, thereby mimicking the process of evaluating the model on completely unseen data.
+In addition to providing an accuracy estimate, the analysis of OOB observations is instrumental in determining feature importance through permutation feature importance. This technique, which will be discussed in the following section, underscores the versatility and utility of OOB observations in enhancing model interpretability and reliability.
+
+\section{The variable framework}
+The real estate sector plays a pivotal role in the global economy, acting as both a barometer of economic stability and a driver of growth. The fluctuations in housing prices have far-reaching implications, affecting everything from macroeconomic policy to individual investment strategies and government housing policies. As such, a deep understanding of the housing market's dynamics is crucial for investors, policymakers, and the general public.
+To explore these dynamics, this study utilizes a dataset from the 1990 California census, publicly available on Kaggle. This dataset provides a unique blend of simplicity and complexity, making it ideal for demonstrating the efficacy of advanced machine learning techniques.
+ It includes a variety of variables from the housing sector, such as location (longitude and latitude), age, size (total rooms and bedrooms), occupancy (pop- ulation and households), economic status (median income), property value (median house value), and ocean proximity of residences in California districts.
+This study aims to accurately forecast Median House Value, thereby deepening the understanding of market dynamics and assisting stakeholders in making well-informed decisions. It goes beyond mere prediction by meticulously analyzing feature importance and model interpretability, essential for applying machine learning effectively in practical scenarios.
+The use of the Random Forest model is particularly fitting due to its robustness and its capability to process diverse datasets efficiently, thereby enhancing the understanding of feature importance and improving predictive accuracy.
+
+\subsection{Feature engineering}
+The Housing Price dataset contains 207 missing entries in the $total\_bedrooms$ variable. Although the Random Forest algorithm is equipped to manage missing values, either by segregating them into distinct nodes or employing surrogate splits, this study opts for imputation using the median of the observed values. This approach is favored because the median is inherently more robust against outliers than the mean. This robustness is particularly beneficial given the potential skewness in real estate data, which can be significantly distorted by extreme values. Thus, median imputation is employed to ensure the integrity and statistical validity of the dataset, facilitating a more reliable analysis.
+
+
+\subsection{Binary variable Ocean Proximity}
+In the process of preparing the Housing Price dataset for advanced machine learning analyses, special attention was given to the categorical variable $ocean\_proximity$.  Due to the unique challenges presented by categorical data in models that predominantly handle numeric input, this variable was initially isolated from the main dataset, ensuring compatibility and preprocessing adequacy for subsequent modeling. 
+Subsequently, a specialized data frame for the  $ocean\_proximity$ variable was constructed. This involved creating binary indicator columns for each category within the variable, a technique known as one-hot encoding.  This transformation not only facilitates the inclusion of categorical data in numerical models but also enhances the interpretability of model outputs, particularly when employing SHAP (SHapley Additive exPlanations) and permutation feature importance methods.
+These methods, which are critical for understanding feature contributions to model predictions, benefit significantly from one-hot encoding. SHAP values can more distinctly attribute prediction impacts to specific categories, while permutation feature importance gains clarity by evaluating the influence of each category independently.
+
+\subsection{Normalization of three variables}
+In the process of preparing the dataset for predictive modeling in this thesis, significant emphasis was placed on transforming raw data to enhance both the model's accuracy and its interpretability. Transformations were applied to create new variables $mean\_pop$(average population per household), $mean\_bedrooms$ (average number of bedrooms per household), $mean\_rooms$ (average number of rooms per household). Thse derived variables serve multiple strategic purposes. Mainly, these transformations help reduce multicollinearity, a common issue in datasets where large counts (like $total\_rooms$ and $total\_bedrooms$) are related. By converting these counts to averages per household, the new features provide a clearer, more independent representation of the data's structure, enhancing the interpretability and reliability of the model's predictions. Moreover, the granularity offered by these per-household metrics aligns closely with the model's objective to achieve high prediction accuracy. By focusing on household-specific factors rather than aggregated totals, the model can more adeptly capture subtle patterns that affect housing prices, thereby improving its predictive performance.
+In conclusion, the engineering of these average-based features is meticulously designed to support the thesis' goals of developing a highly accurate and interpretable predictive model. This strategic choice not only facilitates a deeper understanding of the housing market dynamics but also ensures that the model's findings are robust and grounded in sound statistical reasoning.
+
+
+
+\section{The importance of model agnostics}
+While enhanced predictive performance is often prized in machine learning models, the importance of interpretability, understanding how specific features influence a model's predictions cannot be overstated. 
+In this sense single decission trees offer a level of transparency that allows to interprete how input features influence predictions. 
+On the other hand, the ensemble nature of Random Forests introduces a layer of complexity that obscures this direct traceability.
+To address this critical need for clarity, several model-agnostic methods have been developed to illuminate the contributions of important variables within complex models.
+'Model-agnostic' means that these methods can be applied across various types of machine learning models, enabling the use of advanced models without sacrificing interpretability. 
+This approach has significant benefits, particularly when evaluating and comparing multiple models tasked with solving the same problem. By applying model-agnostic methods, it becomes possible to assess and compare models not only based on their performance but also on their interpretability \cite{molnar2022}.
+In the realm of model agnostics interpretability methods, it is useful to differentiate between global and local approaches. 
+ Global model-agnostic methods, such as Partial Dependence Plots (PDP) and permutation feature importance, emphasize providing an overall understanding of how the model makes predictions based on the entire dataset.
+ By offering an overarching view of the model's performance, global model-agnostic methods can shed light on feature importance rankings and how features interact on average.
+ On the other hand, local model-agnostic tools, exemplified by methods like SHAP (SHapley Additive exPlanations), focus on explaining individual predictions. Notably, SHAP stands out by offering insights on both the global and local levels, making it an invaluable tool for interpreting specific decisions as well as understanding model behavior across the dataset. These local explanations are particularly crucial when it comes to understanding specific decisions and providing decision-makers with reasons for individual outcomes.
+When evaluating feature importance in Random forest models at this point permutation feature importance as a model agnostic tool is heavily used as it relies on the entailed OOB sample. We will delve deeper into the mechanisms of this approach in the next section
+\section{Permutation feature importance}
+Permutation feature importance serves as a powerful mechanism for enhancing model interpretability, elegantly bridging the concepts of feature significance and model accuracy.
+This technique assesses the impact on model performance when the values of a specific feature are randomized, effectively disrupting the connection between the feature and the target outcome. The degradation in model accuracy as a result of this randomization directly reflects the importance of the feature, offering insights into the model's reliance on individual features for making predictions.
+Originally introduced by Breiman in 2001 for Random Forests, the method has since been expanded to apply to a broad range of models, thanks to the work of Fisher, Rudin, and Dominici in 2018. They presented the concept of "model reliance," emphasizing the technique's applicability across different models by measuring the dependency of predictions on specific features, irrespective of the model's architecture.
+The mathematical basis for permutation feature importance within a Random Forest model involves comparing the model's error before and after permuting a feature across the out-of-bag (OOB) samples for each tree. 
+For each tree $k$ in the Random Forest, lets denote the OOB sample as $B_k=(x^{(k)}_j,y^{(k)}_j)$ where $j=1,\ldots,n_{oob}$ indexes the the OOB observations for that tree. The total number of trees is denoted by $n_{tree}$. For each tree $k$, it makes predictions $\hat{y}^{(k)}_j$ on its OOB observations. The MSE for tree k is calculated as : 
+$$MSE_k = \frac{1}{n_{oob}}\sum_{j=1}^{n_{oob}}(y^{(k)}_j-\hat{y}^{(k)}_j)^2$$. Now lets consider a specific feature $i$. After permuting the values of this feature in the OOB observations, we obtain new predictions from tree $k$ denoted as $\hat{y}^{(k)}_{j,i}$, where the subscript $i$ indicates that these predictions are made after the permutation of feature $i$. The MSE for tree $k$ after permuting feature $i$ is then: 
+$$MSE_{k,i} = \frac{1}{n_{oob}}\sum_{j=1}^{n_{oob}}(y^{(k)}_j-\hat{y}^{(k)}_{j,i})^2$$
+The permutation error for a feature $i$ is then given by:
+$$PVIM^{(k)}_i=MSE_{k,i}-MSE_k.$$
+
+Permutation feature importance identifies a feature as crucial when its randomization leads to increased model error, indicating the model's reliance on that feature for accurate predictions. A pertinent discussion in the field revolves around whether to use training or test data for evaluating permutation feature importance.
+Advocates for using test data argue that, generally, evaluating machine learning models on new, unseen data better reflects their predictive performance. Conversely, the use of training data is defended when the primary goal is to understand feature importance, rather than to evaluate model accuracy. In such cases, the entire dataset may be employed as the training set, eliminating the need to reserve observations for a test set solely to gauge feature significance.
+Random Forest models uniquely benefit from using their OOB samples for this purpose. OOB samples allow these models to be trained on the entire dataset while still providing a robust means to assess feature importance, akin to having a separate test set. This approach ensures that the interpretability of Random Forest models is grounded in the data on which they were trained, offering a compromise between the two perspectives.
+In our analysis, particularly in predicting house prices, we leverage OOB samples to evaluate permutation feature importance, providing insights into the significance of various features.
+
+\subsection{Discussion}
+While permutation feature importance is still often used in many frameworks (Example) to identify the most impactful features in predictive modeling. It is shown that its effectivness diminishes 
+in scenarios where there are strong interactions or correlations among features. 
+In such cases, permuting one feature doesn't significantly impact the model's predictive accuracy because the remaining, unshuffled features still carry similar information, thus preserving model performance. 
+This scenario often leads to an underestimation of the importance of correlated features, as the model appears to perform adequately without the original distribution of the permuted feature. 
+Conversely, the importance of non-correlated features might be overestimated since their permutation noticeably reduces model accuracy, falsely elevating their perceived importance due to the lack of correlated counterparts to mitigate information loss.
+ Furthermore, permuting feature values randomly can generate data instances that are highly improbable in real-life situations, presenting the model with scenarios it has never encountered. Relying on these artificial and unrealistic data points to assess feature importance may not be appropriate. This approach can distort our understanding of how features truly influence predictions under normal conditions.
+The fundamental challenge with permutation feature importance is its dependency on changes in model performance (error or loss) to assess feature relevance. 
+ This approach centers on the impact of feature manipulation on model output, aiming to identify how much variance in the model's output each feature can explain.  
+However, this approach can be somewhat misaligned with a more nuanced understanding of feature importance.
+Variance-based measures, on the other hand, emphasize the importance of features that cause significant shifts in the model's prediction function.
+ Techniques like SHAP resonate with this variance-centric view, asserting that a feature's importance is gauged by the extent to which altering it affects the model's output.
+ This focus on variance sharply contrasts with the loss-based logic that underpins permutation feature importance.
+ The limitations of permutation feature importance become particularly evident in cases of overfitting. In such situations, models might rely on irrelevant features, but because the permutation of these features does not significantly impact the accuracy of predictions, they would be mistakenly deemed unimportant. 
+  Conversely, a variance-based approach like SHAP could more accurately reflect these features' true impact by considering their potential to introduce substantial variability in predictions.
+ 
+ \section{SHAP as model agnostic solution}
+ SHAP (SHapley Additive exPlanations), first introduced by \cite{10.5555/3295222.3295230}, is a model-agnostic method designed to assess feature importance by providing insights on both local and global scales. Distinct from methods like permutation feature importance—which offers only a global perspective—SHAP facilitates contrastive explanations, allowing individual predictions to be directly compared both among themselves and against the average prediction of the dataset. This unique ability for detailed comparisons distinguishes SHAP from other global methods, such as feature permutation importance, and local, model-agnostic approaches like LIME.
+ The foundation of SHAP lies in cooperative game theory, specifically drawing upon the Shapley values, a concept developed by Lloyd Shapley in 1953. Originally intended to fairly distribute payouts to players based on their contributions to the overall game, Shapley values are employed in SHAP to quantify the contribution of each feature to a prediction, effectively adapting this game theory concept to the field of machine learning. To further elucidate this theory, the next section will present an illustrative game to demonstrate the calculation of Shapley values.
+ \subsection{Shapley values an example}
+As mentioned above, the concept of Shapley values centers on fairly distributing payouts among participants. Given that definitions of fairness can vary widely and not everyone may agree on a single definition, Shapley values propose a specific version of fairness that is often regarded as egalitarian. \\
+Let's consider a concrete example to illustrate a coalitional game.
+Imagine three students—Elina, Tom, and Lucy—who share an apartment. All of them enjoy watching TV, though their individual interest levels vary. Together, they subscribe to Amazon Prime. 
+Besides the fixed monthly subscription cost, they often rent movies, which adds to the final bill. This month, the total expense reaches \$50 due to these additional rentals. Faced with this cost, the trio must decide how to fairly split the bill. Even though the cost represents a negative payout, this situation aligns well with the principles of a coalitional game. To ensure a fair distribution of costs, it's important to understand what the subscription would cost for various coalitions of students. For example, we might consider how much Elina would pay if she were living alone, or what the cost would be for Lucy and Tom if they were the only ones sharing the apartment.
+Let's assume that the friends have diverse viewing habits which impact their portion of the bill. For instance, Elina, who rents movies daily, would face a cost of \$30 when living alone. Adding Tom to the mix, known for his weekend binge-watching, increases the total expense to \$45. Including Lucy, who occasionally watches documentaries, brings the total to \$50. To systematically explore these variations, we will compile the costs for all possible coalitions Table \ref{tab:subscription_costs} below:
+\begin{table}[htbp]
+	\centering
+	\caption{Subscription costs}
+	\begin{tabular}{lll}
+		\toprule
+		Coalition & Cost & Explanation \\
+		\midrule
+		$\emptyset$ & \$0 & No subscription, no costs. \\
+		\{Elina\} & \$30 & High costs from daily movie rentals. \\
+		\{Tom\} & \$20 & Lower costs, primarily weekend watching. \\
+		\{Lucy\} & \$10 & Minimal costs, watches documentaries occasionally. \\
+		\{Elina, Tom\} & \$45 & Increased costs from both's frequent viewing. \\
+		\{Elina, Lucy\} & \$40 & Costs moderated by mixed viewing habits. \\
+		\{Tom, Lucy\} & \$25 & Moderate costs from their less frequent usage. \\
+		\{Elina, Tom, Lucy\} & \$50 & Total cost reflects full usage by all. \\
+		\bottomrule
+	\end{tabular}%
+	\label{tab:subscription_costs}%
+\end{table}%
+In our example, the symbol $\emptyset$ represents a coalition without any members, indicating that no subscription has been made. To further investigate how much each student contributes to the cost of the subscription, Table \ref{tab:coalition_costs} will now provide the marginal contributions (MC) of each student.
+\begin{table}[htbp]
+	\centering
+	\caption{Coalition Costs and Marginal Contributions (MC)}
+	\begin{tabular}{lllll}
+		\toprule
+		Coalition Before Joining & Joining Member & Cost Before & Cost After Joining & MC \\
+		\midrule
+		$\emptyset$ & Elina & \$0 & \$30 & \$30 \\
+		$\emptyset$ & Tom & \$0 & \$20 & \$20 \\
+		$\emptyset$ & Lucy & \$0 & \$10 & \$10 \\
+		\{Elina\} & Tom & \$30 & \$45 & \$15 \\
+		\{Elina\} & Lucy & \$30 & \$40 & \$10 \\
+		\{Tom\} & Elina & \$20 & \$45 & \$25 \\
+		\{Tom\} & Lucy & \$20 & \$25 & \$5 \\
+		\{Lucy\} & Elina & \$10 & \$40 & \$30 \\
+		\{Lucy\} & Tom & \$10 & \$25 & \$15 \\
+		\{Elina, Tom\} & Lucy & \$45 & \$50 & \$5 \\
+		\{Elina, Lucy\} & Tom & \$40 & \$50 & \$10 \\
+		\{Tom, Lucy\} & Elina & \$25 & \$50 & \$25 \\
+		\bottomrule
+	\end{tabular}%
+	\label{tab:coalition_costs}%
+\end{table}%
+The marginal contribution (MC) of each individual is calculated as the difference between the value of a coalition including the individual and the value of the coalition without that individual. To accurately assess these contributions using Shapley values, it is necessary to consider all possible permutations of the coalition members—Elina, Tom, and Lucy. Given that there are three members, there are $ 3! = 3 * 2 * 1 = 6$ possible permutations. These permutations are: 
+\begin{itemize}
+	\item Elina, Tom, Lucy
+	\item Elina, Lucy, Tom
+	\item Tom, Elina, Lucy
+	\item Tom, Lucy, Elina
+	\item Lucy, Tom, Elina
+	\item Lucy, Elina, Tom
+\end{itemize}
+ This enumeration allows us to systematically calculate the Shapley value for each individual by averaging their marginal contributions across all permutations. 
+For instance, Elina's Shapley value is calculated by averaging her contributions across all permutations: she joins first in 2 out of 6 cases, joins after Tom or Lucy individually in 1 out of 6 cases each, and joins last after both in 2 out of 6 cases. The Shapley value for Elina is computed as follows:
+$$
+\frac{1}{6} \left( 
+\underset{\text{E to } \emptyset}{2 \cdot \$30} + 
+\underset{\text{E to T}}{1 \cdot \$25} + 
+\underset{\text{Eto L}}{1 \cdot \$30} + 
+\underset{\text{E to T,L}}{2 \cdot \$25} 
+\right) = \$27.50
+$$
+We multiply by $\frac{1}{6}$ because there are 6 permutations, each weighted equally. If we perform similar calculations for Tom and Lucy, we find Shapley values of \$15 for Tom and \$7.50 for Lucy (details can be found in Equation \ref{eq:tom_shapley} in the Appendix). The individual contributions of \$7.50, \$17.50, and \$27.50 sum to the total cost of \$50. 
+After having explored how to calculate Shapley values through the subscription cost example we can now formalize the Shapley value formula for the general case. 
+\begin{equation}
+	\phi_j = \sum_{S \subseteq N\backslash\{j\}} \frac{|S|!(N - |S| - 1)!}{N!}(v(S \cup \{j\}) - v(S)) 
+\end{equation}
+The Shapley value $\phi$ is then interpreted as the wieghted average of a players marginal contribution to all possible coalitions. 
+The Shapley values formula in this sense was derived from four central axioms that define fariness when it comes to distribute a payout among the Team. The 4 central axioms are Efficiency, Symmetry, Dummy and Aditivity. 
+
+
+
+
+\newpage
+\section{Appendix}
+\subsection{Variables I used}
+	\begin{table}[ht]
+	\centering
+	\begin{tabular}{ll}
+		\toprule
+		\textbf{Variable Name} & \textbf{Description} \\
+		\midrule
+		Longitude & Geographic coordinate defining the westward measure \\
+		Latitude & Geographic coordinate defining the northward measure \\
+		HousingMedianAge & Median age of homes in a district \\
+		TotalRooms & Aggregate number of rooms in homes \\
+		TotalBedrooms & Aggregate number of bedrooms in homes \\
+		Population & Total population in a district \\
+		Households & Total households in a district \\
+		MedianIncome & Median household income (in \$10,000 units) \\
+		MedianHouseValue & Median value of homes (in USD) \\
+		OceanProximity & Proximity of homes to the ocean \\
+		\bottomrule
+	\end{tabular}
+	\caption{Description of Variables in the California Housing Dataset}
+	\label{tab:variables}
+\end{table}
+
+
+
+
+
+
+
+
+\subsection{The bias variance trade of explained}
+The picture shows the developemnt of the test and training error in relation to the depth of the regression tree. It can be seen that as overfitted trees, meaning trees that grow really large usually perform really well on training data mostly even excelling in training data as they can be grown to ways in which the training data converges toward zero but performs very poorly on new test data. On the other hand trees that are oversimpled and therefore not really deep grown tend to perform poorly on test data and on training data as they completly fail to capture the structure in the data. The decission tree in this context doesnt allow you to have a sensitive analysis of what the best trade of between bias and variance is. Thats why in practice these models usually dont tend to work well. 
+\subsection{Bagging}
+Nevertheless the variance issue can be adressed by overfitting a bunch of trees and then bundeling them together in a process that is known as bagging. Bagging also invented is a process that significantly helps in reducing the variance. 
+$$(f^{M}(x)) =  \frac{1}{M}\sum_{m=1}^{M}(b^{M}(x)-f^{M}(x))^2$$
+where $(f^{M}(x))$ can be seen as our ensemble model , so the average of all different base liner models. The instability of the ensemble model therefore can be seen as the variance of the individula baseline learners. The baselearners are here substracted by the mean of the baselearners. It can also be referred to as the variance of the ensemble members predictions. 
+This can be simplifyed to : 
+$$(f^{M}(x)) =  \frac{1}{M}\sum_{m=1}^{M}((b^{M}(x)-y)-(y-f^{M}(x)))^2$$
+
+$$E[(h_D(x)-h(x))^2]$$ where $h_D(x)$ can be seen as a high variance classifier trained on the data set D. The idea now is to draw $D_1,\ldots,D_M$ samples and then train an overfitting classifyer on each of them. $$h(x): \frac{1}{m}\sum_{j=1}^{m}h_{D_{j}}(x)$$ whereas if m converges towards infinity the $h(x)$ appromiates towards the mean$h(x)$ by the law of large numbers.  and therefore $h_{D_{j}}(x)$ comes closer to the mean $h(x)$ what reduces the error. This is not done in practice by everyone as different subsamples of data are not often encountered in practice. The Bootsrap application of bagging can then be used as we draw m different subsamples of the from the original training data with replacement. The several learners dont turn now towards  mean $h(x)$ becaus the law of weak numbers is now violated as the datasets are not dependent when doing bootstrap. So the independency assumption is violated
+\subsection{Independency problem}
+In the strictest mathematical sense, the trees in a Random Forest are not completely independent from one another because they are trained on bootstrapped samples of the same original dataset
+While bootstrap samples are drawn independently for each tree, the fact that they are drawn from the same original dataset introduces some level of correlation between the trees. This correlation is due to the overlap in data points across different trees' training sets.
+The process of selecting a random subset of features for determining splits at each node in the tree introduces another layer of randomness that can decrease the correlation between trees, as different trees will make decisions based on different sets of features. Given the correlation between trees, the variance of the ensemble's prediction does not decrease as rapidly as $\frac{\sigma^2}{n}$ (the formula for independent variables). However, the reduction in variance is still significant, leading to the ensemble's overall prediction being more stable than individual tree predictions. The actual variance reduction is more nuanced and depends on both the degree of correlation between trees and the mechanisms Random Forest uses to introduce diversity and decorrelate the trees' predictions.
+
+\subsection{The weak law of large numbers}
+The Weak Law of Large Numbers (WLLN) is a fundamental theorem in probability theory and statistics that describes the behavior of averages of random variables under certain conditions. It tells us that, under the right circumstances, the sample average of a sequence of independent and identically distributed (i.i.d.) random variables will converge in probability towards the expected value (mean) of the distribution from which the variables are drawn, as the number of observations in the sample increases.
+Let $X_1,X_2,\ldots,X_n$ be an infinite sequence of i.i.d. random variables with a common expected value  $\mu =E[X_i]$ and finite variance $\sigma^2=Var(X_i)$. The Weak Law of Large Numbers states that for any positive number $\epsilon >0$  the probability that the sample average $\bar{X}_n = \frac{1}{n}(X_1+X_2+\ldots+X_n)$ deviates from the expected value $\mu$ by more than $\epsilon$ approaches zero as n approaches infinity:
+$$\lim_{n \to \infty} P(\bar{X}_n-\mu>\epsilon) = 0$$In simpler terms, this means that as you take more samples, the average of those samples is very likely to get closer and closer to the true mean $\mu$ means that the likelihood of the sample average differing from the population mean by more than a small amount becomes increasingly small; it does not guarantee that the sample average will exactly equal the population mean for any finite sample size.
+
+\subsection{Shapley values for Tom and Lucy}
+\begin{equation}
+\frac{1}{6} \left( 
+\underset{\text{T to } \emptyset}{2 \cdot \$20} + 
+\underset{\text{T to E}}{1 \cdot \$15} + 
+\underset{\text{Tto L}}{1 \cdot \$15} + 
+\underset{\text{T to E,L}}{2 \cdot \$10} 
+\right) = \$15
+\label{eq:tom_shapley}
+\end{equation}
+And for Lucy:
+\begin{equation}
+\frac{1}{6} \left( 
+\underset{\text{L to } \emptyset}{2 \cdot \$10} + 
+\underset{\text{L to E}}{1 \cdot \$10} + 
+\underset{\text{Lto T}}{1 \cdot \$5} + 
+\underset{\text{L to E,T}}{2 \cdot \$5} 
+\right) = \$7.50
+\label{eq:lucy_shapley}
+\end{equation}
+
+\subsection{Shapley values calculation with formula }
+In this example:
+\begin{itemize}
+	\item \(N\): This is the set of all players. In your example, \(N = \{Elina, Tom, Lucy\}\).
+	\item \(S\) represents any subset of \(N\) that does not include player \(j\) whose Shapley values we are calculating. For instance, if we are calculating the Shapley value for Elina, \(\phi_{Elina}\), then \(S\) can be \(\emptyset\), \(\{Tom\}\), or \(\{Lucy\}\).
+	\item \((v(S \cup \{j\}) - v(S))\) is seen as the marginal contribution of player \(j\) when joining coalition \(S\). For example, if \(S = \{Tom\}\) and \(j\) is Elina, then \(v(S \cup \{j\}) = v(\{Tom, Elina\})\) and \(v(S) = v(\{Tom\})\).
+\end{itemize}
+
+The Shapley value for Elina is calculated using the formula:
+\[
+\phi_{Elina} = \sum_{S \subseteq N\backslash\{Elina\}} \frac{|S|!(|N| - |S| - 1)!}{|N|!}(v(S \cup \{Elina\}) - v(S))
+\]
+
+Breaking down the formula, we calculate each contribution from all subsets \(S\) that do not include Elina:
+\begin{align*}
+	\text{For } S = \emptyset &: \quad v(S \cup \{Elina\}) = v(\{Elina\}), \quad v(S) = v(\emptyset), \quad \text{Contribution: } \frac{0!(3-0-1)!}{3!}(v(\{Elina\}) - v(\emptyset)) \\
+	\text{For } S = \{Tom\} &: \quad v(S \cup \{Elina\}) = v(\{Tom, Elina\}), \quad v(S) = v(\{Tom\}), \quad \text{Contribution: } \frac{1!(3-1-1)!}{3!}(v(\{Tom, Elina\}) - v(\{Tom\})) \\
+	\text{For } S = \{Lucy\} &: \quad v(S \cup \{Elina\}) = v(\{Lucy, Elina\}), \quad v(S) = v(\{Lucy\}), \quad \text{Contribution: } \frac{1!(3-1-1)!}{3!}(v(\{Lucy, Elina\}) - v(\{Lucy\})) \\
+	\text{For } S = \{Tom, Lucy\} &: \quad v(S \cup \{Elina\}) = v(\{Tom, Lucy, Elina\}), \quad v(S) = v(\{Tom, Lucy\}), \quad \text{Contribution: } \frac{2!(3-2-1)!}{3!}(v(\{Tom, Lucy, Elina\}) - v(\{Tom, Lucy\}))
+\end{align*}
+
+Summing all these contributions provides us with \(\phi_{Elina}\), representing her fair contribution to the total subscription cost based on the value she adds to different coalitions.
+
+
+The Shapley value, denoted \(\phi_j\), is a solution concept in cooperative game theory. It represents a fair distribution of the total payoff generated by a coalition among its players. The value for each player \(j\) is calculated using the formula:
+\begin{equation}
+	\phi_j = \sum_{S \subseteq N \setminus \{j\}} \frac{|S|!(|N| - |S| - 1)!}{|N|!} (v(S \cup \{j\}) - v(S))
+\end{equation}
+where:
+\begin{itemize}
+	\item \(N\) is the set of all players in the game.
+	\item \(S\) is a subset of \(N\) that does not include player \(j\).
+	\item \(v(S)\) is the value function that assigns a value to each coalition \(S\).
+	\item \(v(S \cup \{j\}) - v(S)\) represents the marginal contribution of player \(j\) to the coalition \(S\).
+	\item The factor \(\frac{|S|!(|N| - |S| - 1)!}{|N|!}\) is a weighting coefficient that accounts for the number of permutations in which the coalition \(S\) can be formed before \(j\) joins.
+\end{itemize}
+
+\bibliographystyle{plain}
+\bibliography{referenzen}
+\end{document}
