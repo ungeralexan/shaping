@@ -68,21 +68,47 @@ Moreover, over other prior heuristic mehods such as the Saabas method used to ex
 Next to enhancing interpretability and feature importance TreeSHAP in my context will be used to improve to predcition accuracy.
 Therefore, I will explore whether insights derived from TreeSHAP's SHAP value importance plots can guide feature selection and thereby potentially enhance the performance of the random forest model.
 In this sense the approach in this paper is dual faceted and aims not only to detect hidden patterns in the data, at the same time it aims to use the gained insights to improve prediction accuracy. 
-For the following the paper is structure as follows. In the next section I will be introducing a random forest model and the mechanism behind the splitting process in a decission tree.
-Special emphasis will be hold on the bagging process, that can be seen as the base for reducing overfitting in such a complex model. In section three I will present a often used model agnostic method used to assess feature importance with the Permutation feature importance and therby emphasize on the problems that emerge in this tool specially when we have to handle correlated features.  In section 4 then I will be introducing the concept of SHapley values based on an made up example and then swap over to the implication of SHapley values in machine learning.
+For the following the paper is structure as follows. In the next section I will introduce my feature framework and mention a few changes I made to handle high correlated features.
+AfterwardsI will be introducing a random forest model and the mechanism behind the splitting process in a decission tree.
+Special emphasis will be hold on the bagging process, that can be seen as the base for reducing overfitting in such a complex model. In section 4 I will present a often used model agnostic method used to assess feature importance with the Permutation feature importance and therby emphasize on the problems that emerge in this tool specially when we have to handle correlated features.  In section 5 then I will be introducing the concept of SHapley values based on an made up example and then swap over to the implication of SHapley values in machine learning.
 There we will later brierly explore KernelSHAP, particularly its strategy of sampling predictions from marginal contributions, which, while efficient, may introduce inaccuracies when features are correlated but assumed to be independent. As a solution I will be presenting the treeSHAP algrithm and briefly expalin how this algorthm allows to calculate SHAP values in polynomial time.
  Despite its advantages, I will also discuss some limitations associated with the use of conditional expectations within TreeSHAP that could affect the reliability of the algorithm. In the end we will come to my findings and then figure out whether SHAP helped enhancing the prediction accuracy.
+\section{The variable framework}
+The real estate sector is a fundamental component of the global economy, as it serves botth as a barometer for economic health and a catalyst for economic growth. Any fluctuations in housing prices can result in extensive implications, influencing macroeconomic policy, individual investment decisions, and givernment housing strategies. This thesis aims to elucidate the dynamics of the housing market by leveraging advanced an advanced machine learning model such as the random forest.
+Therefore I will employ a random forest model to analyze a Calfornia Housing data set which is derived from the 1990 California census and is publicly available on \href{https://www.kaggle.com/datasets/camnugent/california-housing-prices}{Kaggle}.
+My decission to opt for this dataset\footnote{The exact definition of the variables can be seen in the Appendix  subsection \ref{tab:variables}} is due to its blend of simplicity and complexity, offering a detailed perspective on diverse factors influencing California’s housing markets, including geographic location (longitude and latitude), housing age, size (total rooms and bedrooms), occupancy (population and households), economic status (median income), property value (median house value), and proximity to the ocean.
+Prior making predictions and enhancing the interpretability of the random forest using SHAP, it is essential to first examine the datasets structure and labeling. This preliminary analysis will inform any necessary data cleaning or feature engineering steps
+	
+	
+	
+	
+	
+	
+	
 
-
-	
-	
-	
-	
-	
-	
-	
-	
-	
+\section{Appendix}
+\subsection{Variables I used}
+\begin{table}[ht]
+	\centering
+	\begin{tabular}{ll}
+		\toprule
+		\textbf{Variable Name} & \textbf{Description} \\
+		\midrule
+		Longitude & Geographic coordinate defining the westward measure \\
+		Latitude & Geographic coordinate defining the northward measure \\
+		HousingMedianAge & Median age of homes in a district \\
+		TotalRooms & Aggregate number of rooms in homes \\
+		TotalBedrooms & Aggregate number of bedrooms in homes \\
+		Population & Total population in a district \\
+		Households & Total households in a district \\
+		MedianIncome & Median household income (in \$10,000 units) \\
+		MedianHouseValue & Median value of homes (in USD) \\
+		OceanProximity & Proximity of homes to the ocean \\
+		\bottomrule
+	\end{tabular}
+	\caption{Description of Variables in the California Housing Dataset}
+	\label{tab:variables}
+\end{table}
 	
 \bibliographystyle{plain}
 \bibliography{referenzen}
