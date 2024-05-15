@@ -1,0 +1,712 @@
+\documentclass[12pt]{article}
+
+\usepackage[a4paper, left=2.5cm, top=2.5cm, right=2.5cm, bottom=2cm]{geometry}
+\usepackage{setspace}
+\usepackage{booktabs}
+\usepackage{hyperref} % For hyperlinks
+\usepackage{graphicx} % For images
+\usepackage{tabularx} % For flexible-width columns
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{float}
+\usepackage{natbib}
+
+
+
+
+
+\begin{document}
+	\clearpage % or \bigskip, depending on your preference
+	\fontsize{10pt}{12pt}\selectfont
+\title{Shapley values and SHAP for Feature Importance in House Price Predictions}
+\author{Alexander Unger}
+\date{Date of Submission: 28 May}
+
+	
+	\begin{titlepage}
+		\begin{center}
+			\vspace*{1cm}
+			
+			\textbf{\Large Shapley values and SHAP for Feature Importance in House Price Prediction}
+			
+			\vspace{0.5cm}
+			Bachelor’s Thesis
+			
+			\vspace{1.5cm}
+			
+			\textbf{Alexander Unger}
+			
+			\vfill
+			
+			A thesis presented for the degree of\\
+			Bachelor of Science (B.Sc.)
+			
+			\vspace{0.8cm}
+			
+			
+			Department of Econometrics \& Statistics\\
+			University of Hohenheim
+			
+			\vspace{0.8cm}
+			
+			Professor Dr. Robert Jung\\
+			Examiner: Professor Dr. Robert Jung
+			
+			\vspace{0.8cm}
+			
+			Date of Submission: 28 May
+			
+		\end{center}
+	\end{titlepage}
+
+
+\tableofcontents
+
+\newpage
+\setstretch{1.4}
+\section{Introduction}
+Recent advancements in tree-based models, such as random forests and gradient-boosted trees, have markedly transformed the landscape of predictive modeling.
+These models are exceptionally capable of managing nonlinear and heterogeneous data types, which encompass both numerical and categorical variables. As a result, they have significantly diminished human error and improved efficiency across multiple industries.
+Despite these advancements, the complexity of these methods often leads to a 'black box' phenomenon, where the rationale behind the model's decisions remains obscure , see \citep{Rudin2019Why}. 
+This lack of transparency challenges our understanding of model predictions, the importance of features, and their overall influence on outcomes. 
+The absence of clear explanations can pose significant risks; without transparent explanations, individuals might draw their own, potentially incorrect, conclusions about how these models make predictions.
+Furthermore, it could hinder researchers and developers from examining and debugging algorithms effectively, which could lead to the deployment of biased models, see \citep{molnarSHAP}.
+Therefore, the challenge today lies not just in developing advanced and accurate algorithms but also in ensuring that these algorithms' outcomes are interpretable and accessible to humans. 
+This lack of transparency in complex models presents individuals with a crucial dilemma: choosing simpler models for detailed insights into the models’ predictive mechanisms or accepting robust and accurate performance without understanding the underlying logic, \citep[Section~3.1]{molnar2022}.
+This trade-off is particularly crucial in sectors with significant consequences, such as finance, healthcare, and criminal justice. For instance, in finance, understanding feature importance in credit scoring and fraud detection is critical for ensuring transparent and fair decision-making, see \citep{KVAMME2018207}.
+In healthcare, insights into feature values that influence predictions are vital, not only for diagnosing diseases but also for identifying contributing factors essential in developing personalized treatment plans, see \citep{Elish2020ASO}.
+Furthermore, in critical areas like criminal justice and environmental science, interpreting model contributions to decision-making can aid in identifying and mitigating biases, fostering trust in models designed to have long-term impacts on society and the planet, see \citep{crimedet}.
+As a consequence, model interpretability is often strongly connected to model selection, directly impacting performance outcomes. Nowadays, in various industries, the lack of interpretability of complex models still enables stakeholders to favor simpler alternatives, which may not completely capture inherent dependencies and interactions in the data. 
+This can lead to significant oversight of the data structure, resulting in diminished prediction accuracy. 
+In response to these challenges, specialized fields such as Explainable Artificial Intelligence (XAI) and Interpretable Machine Learning (IML) have emerged.
+These disciplines are dedicated to developing frameworks that demystify complex models, making them more accessible. 
+The existing research specialized in interpreting complex models can be distinguished between global and local interpretability, \citep[Section~3.3]{molnar2022}. 
+Global interpretability refers to the ability to understand the overall behavior of a model across all instances. On the other hand, local interpretability focuses on explaining the decision-making process for individual predictions, providing insight into the reasoning behind specific model outputs.
+For tree ensemble models like random forest, two commonly used methods to interpret models and assess feature importance globally are permutation feature importance, \citep{article}, and partial dependence plots, \citep{4a848dd1-54e3-3c3c-83c3-04977ded2e71}. 
+Although these methods offer valuable global insights, they fail in explaining individual predictions. 
+Similarly, model agnostic methods like LIME, \citep{10.1145/2939672.2939778}, are effective for local interpretability but might not capture the full behavior of complex models or the contributions of each feature across all instances. 
+This highlights the need for a framework that bridges the gap between local and global understanding while being adaptable across various model architectures. 
+In response, SHAP (SHapley Additive exPlanations), a method leveraged from the Shapley values concept of cooperative game theory, emerged as a powerful tool to interpret machine learning models both on a local and a global scale.
+Shapley Values, introduced by \citet{shapley:book1952}, offer a fair solution in cooperative game theory when addressing the issue of fairly distributing a payout among participants who have contributed differently to the payout.
+What distinguishes Shapley values from other methods is their foundation on four core axioms that ensure a fair distribution.
+These principles guarantee that the contribution of each feature to a model's prediction is allocated justly, mirroring the fair payout distribution among players in a game. Notably, Shapley values are the unique local explanation method grounded in such a robust theoretical framework, making them a critical tool for interpreting complex models transparently. 
+Shapley values were initially proposed as a method for interpreting machine learning predictions in 2010 by \citet{article2}, with subsequent refinements made in 2013 by \citet{article3}.
+However, early applications were constrianed by limitations in accessibility and computational demands.
+A significant breakthrough occured in with the introduction of SHAP (Shapley Additive Explanations) by \citet{10.5555/3295222.3295230}, which incorporated the Kernel SHAP algorithm.
+Inspired by the LIME framework, this model-agnostic method uses weighted linear regression to address computational issues, enhancing usability for a wider range of models.
+Moreover, the concurrent development of TreeSHAP by \citet{unknown}, provided a tailored approach for tree-based models, offering rapid and detailed explanations with efficient computational complexity. \\
+Tree-based ensemble models are renowned for their superior accuracy with tabular data compared to deep learning methods, see \citet{Chen_2016},\citet{grinsztajn2022treebased}, and \citet{lundberg2019explainable}.
+However these models often lack transparency \ref{fig:compin}.
+To address this challenge, this thesis employs the TreeSHAP algorithm, to enhance the understanding of feature importance in a random forest model used for predicting house prices.
+The analyiss utilizes the California Housing Prices dataset from \href{https://www.kaggle.com/datasets/camnugent/california-housing-prices}{Kaggle}, featuring 14 variables and over 20,000 observations. The data set presents a complex challenge well-suited to TreeSHAP's advantages.
+Unlike previous inconsistent methods, TreeSHAP provides consistent interpretations, as noted by \citet{lundberg2019consistent}, and is computationally faster than model agnostic SHAP approaches.
+This computational efficiency is critical in handling large datasets and guiding feature selection, which can enhance the predictive accuracy of the model.
+The dual aim of this thesis is to uncover hidden data patterns and leverage these insights to improve model performance, thus advancing both interpretability and predictive capability.\\
+The structure of this paper is organized as follows: Section 2 introduces the fundamental concept of the random forest model and the underlying mechanisms of the decision tree splitting process. Section 3 discusses the Permutation feature importance method and outlines its limitations, particularly in handling highly correlated features. In Section 4, the concept of Shapley values is explored through an example, followed by their application within the machine learning framework, emphasizing the TreeSHAP algorithm. Section 5 presents the analysis and findings of the study. The paper concludes with Section 6, which summarizes the findings and implications of the research.
+
+
+
+
+\section{Decission trees}
+In the course of this thesis a random forest model will be used. Central to this model are decision trees, which are simpler and more interpretable but less accurate than the ensemble model. To understand this further this thesis will delve into the detailed methodology of the splitting process in regression trees.
+
+
+\subsection{The single regression tree}
+The process of fitting a simple regression tree on training data $D=(X,Y)$, where $X$ denotes a set of features $(X_1, X_2 \ldots X_T)$ and $Y$ is the response variable, involves a series of binary splitting decisions starting at the root of the tree.  Decision trees are typically illustrated with the root at the top.
+ During the splitting process, the tree algorithm divides the predictor space into different, non-overlapping regions $R_1, R_2, \ldots R_Z$ based on the feature values. Each split aims to minimize the Residual Sum of Squares (RSS) which is given by
+ \begin{equation}
+\text{RSS} = \sum_{z=1}^{Z} \sum_{i \in R_z} (y_i - \hat{y}_{R_z})^2,
+ \end{equation}
+see \citep[Section~8.1.1]{statlearning},
+where \(\hat{y}_{R_z}\) represents the mean response for the training observations within the $z$th region. 
+This greedy approach selects the best split at each step, focusing solely on immediate improvements without considering future splits. In each step, the algorithm evaluates all predictors and possible split points, then chooses the one that results in the lowest RSS. After a split, the process repeats for the resulting regions, continuing until a predefined stopping criterion is met, such as a maximum number of leaves or a minimum number of observations in a region to justify further splitting.
+Once the tree has been fully grown, for a given observation \(x\), the model's prediction is then given by
+ \begin{equation}
+f(x) = \sum_{z=1}^{Z} \hat{y}_{R_z} \cdot I(x \in R_z),
+ \end{equation}
+where \(I(x \in R_z)\) is an indicator function that equals 1 if \(x\) belongs to region \(R_z\), and 0 otherwise, with \(\hat{y}_{R_z}\)being the mean response for  within that region. Once the tree has been fully grown, predictions for new observations are made by determining the region to which they belong to and using the mean response from that region.
+\subsection{Bias Variance Tradeoff}
+While decision trees are versatile, their effectiveness is significantly impacted by the bias-variance tradeoff, a fundamental concept in machine learning that describes how a model's complexity affects its performance on unseen data. Models with high bias make strong assumptions about the data structure and often lead to underfitting, where critical patterns are missed. In contrast, models with high variance overfit by treating random fluctuations in the training data as significant patterns, which impairs their ability to generalize.
+Decision trees are particularly susceptible to this tradeoff: deep trees can capture detailed data specifics, leading to overfitting, while shallow trees may fail to model underlying structures adequately, resulting in underfitting. This instability underscores the challenge in using decision trees for reliable predictions. To mitigate these issues, this paper will implement a Random Forest model as suggested by \citet{article}.
+
+
+\subsection{Random forest}
+Random Forests are ensemble learning methods that enhance prediction accuracy by aggregating the outputs of multiple decision trees. This method utilizes a technique known as bagging, to achieve high prediction accuracy and robustness against overfitting.
+Bagging involves two main steps, which include bootstrapping and aggregation.
+Bootstrapping creates diverse training subsets by repeatedly sampling with replacement from the original dataset. Each subset is then used to train fully grown, individual decission trees. Even though these single trees may overfitt their respective subsets, the key to Random Forests is the aggregation of these tree's outputs. 
+This theoretical foundation of Random Forests aligns with the Weak Law of Large Numbers (WLLN), as discussed in \citet[Section~6]{IBE2014185}. The WLLN suggests that as more independent estimators (trees) are added to the model, the ensemble's average predictions will increasingly converge towards the expected population mean. This convergence is critical for ensuring that despite individual tree variance, the overall model remains accurate and stable. Therefore, by using bootstrapping as part of the bagging process, Random Forests simulate the conditions required by the WLLN using only a single dataset. Each tree, trained on a slightly different subsample acts as an independent estimator, and thereby contributes to a collective output that effectively balances bias and variance. 
+This method reduces variance without significantly increasing bias.
+Despite the theoretical independence assumed by the WLLN, the trees in a Random Forest are not completely independent, as they are derived from the same original dataset. This could potentially lead to some correlation among the trees, which might impact the ensemble's effectiveness.
+However, this potential interdependency is effectively mitigated by the random selection of feature subsets for each split in the tree construction process. In Random Forests, not only are different data subsets used to grow each tree, but each tree is also built using a random subset of features at every decision point. 
+ This unique element of random forest, ensures variations in decision paths among the trees, even if they originate from similar subsets.
+ This can be quantified by considering a Random Forest model composed of $M$ trees, where each tree is trained on a unique bootstrapped subset of the original dataset $D$. Bootstrapping, as a key process within bagging, ensures that each subset $D_m$ used to train a tree is different, promoting diversity among the trees. The model's final prediction denoted $\hat{\bar{f}}(X)$, is calculated as the average of the predictions from all $M$ trees, mathematically represented as
+  \begin{equation}
+\hat{\bar{f}}(X): \frac{1}{M} \sum_{m=1}^{M}\hat{f}_m(X),
+ \end{equation}
+see \citep[Section~8.2.1]{statlearning}.
+In the above equation, $\hat{f}_m(X)$ represents the prediction from the $m$th tree, where each $\hat{f}_m$, operates on a bootstrapped subset of the entire dataset denoted as $D_m$.
+This averaging process reduces variance by smoothing out irregularities in individual tree predictions, thereby optimizing the bias-variance trade-off. This balance is crucial for models to perform well on training data and generalize effectively to new, unseen datasets.
+
+	
+\subsection{Out-of-bag error}
+Random Forest introduces an unique property as a direct consequence of its bootstrapping process. 
+When constructing each tree, the algorithm randomly selects observations from the original dataset with replacement, leaving out about one-third of the observations on average.
+This phenomenon is quantified by evaluating the likelihood that a specific observation is omitted from a bootstrapped sample, which is given by:
+$\text{OOB Probability: } P(\text{not drawn}) = \left(1-\frac{1}{n_\text{ov}}\right)^{n_\text{ov}} \text{as}, n_\text{ov} \to \infty = \frac{1}{e} \approx 0.37.$
+Here, $n_\text{ov}$ denotes the total number of observations in the original dataset.
+As $n_\text{ov}$ approaches infinity, the probability of being exluded from the bootstrapping procedure approaches $\frac{1}{e}$ (approximately 37\%).
+These omitted observations, which do not contribute to a particular tree’s training dataset, are known as OOB observations.
+This phenomenon allows OOB observations to serve as an unbiased internal validation set for the corresponding tree, providing a practical method to estimate the model's prediction accuracy without requiring a separate validation dataset.
+ This estimation is referred to as the OOB error.
+In addition to providing an accuracy estimate, the analysis of OOB observations is instrumental in determining feature importance through permutation feature importance. This analysis will evaluate model performance based on both traditional test set errors and the OOB error.
+
+% n is the total number of data points in the data set D
+
+\subsection{Permutation feature importance}
+
+While predictive performance is a primary focus in predictive modeling, understanding how specific features influence a model’s predictions, referred to as model interpretability, is equally crucial. 
+Decision trees inherently offer transparency by showing how inputs affect predictions. However, the ensemble nature of Random Forests adds complexity, obscuring direct feature traceability.
+To enhance interpretability in Random Forest models, \citet{article} introduced Permutation Feature Importance (PFI). 
+This method has since evolved into a model-agnostic technique, broadening its applicability across various model types, see \citep{fisher2019models}.
+PFI enhances model interpretability by measuring the impact of randomizing feature values on model performance.
+This technique disrupts the association between features and the target outcome, with a significant drop in model accuracy indicating the importance of a feature.
+The literature debates whether to use training or test data for assessing feature importance, for further information see \citep[Section~8.5.2]{molnar2022}. In this analysis,
+feature importance is assessed by measuring the increase in error when each feature is permuted in the out-of-bag samples for each tree.
+Let $B_m=(\textbf{x}^{(m)}_i,y^{(m)}_i)$ represent the OOB sample for a tree $m$, where $i$ indexes the OOB observations. For tree $m$, predictions $\hat{y}^{(m)}_i$  are made on its OOB observations, with the mean squared error (MSE) calculated as 
+\begin{equation}
+\text{MSE}_m = \frac{1}{n_\text{oob}}\sum_{i=1}^{n_\text{oob}}(y^{(m)}_i-\hat{y}^{(m)}_i)^2,
+\end{equation}
+where $n_{\text{oob}}$  denotes the number of OOB observations for a tree $m$. 
+After permuting the values of a specific feature $X$ in the OOB observations, new predictions $\hat{y}^{(m)}_{i,X}$ are made, and the MSE is recalculated
+\begin{equation}
+\text{MSE}_{m,X} = \frac{1}{n_\text{oob}}\sum_{i=1}^{n_\text{oob}}(y^{(m)}_i-\hat{y}^{(m)}_{i,X})^2.
+\end{equation}
+The permutation error for feature $X$  in a given tree $m$ is given by
+$
+\text{PVIM}^{(m)}_X=\text{MSE}_{m,X}-\text{MSE}_m.$ The general feature importance for a specific feature $X$ results then after averaging across all the trees : $ \text{PVIM}_{X} = \frac{1}{M}\sum_{m =1}^{M} \text{PVIM}^{(m)}_X$.
+For a further specification, see \citep[Section~6.2.2]{wei}.
+This value, $\text{PVIM}_X$, quantifies the increase in error due to the permutation of feature $X$, indicating the importance of the feature. As mentioned, a feature is identified as crucial when its randomization leads to a significant increase in model error, reflecting the model's reliance on that feature for making accurate predictions.
+
+
+\subsection{Discussion}
+While permutation feature importance (PFI) is widely used to identify key features in predictive modeling, its effectiveness is reduced in scenarios with strong feature interactions or correlations.
+This limitation arises because PFI disrupts the relationships among correlated features by randomly permuting the values of a feature, thereby breaking the natural associations.
+This permutation can generate highly improbable data instances, which present the model with unrealistic scenarios. Evaluating feature importance based on these unlikely instances can lead to biased interpretations, as it forces the model to make predictions based on artificial data points. Such distortions can obscure the true influence of features on predictions, as discussed in \citep[Section~8.5.5]{molnar2022}.
+Furthermore, as mentioned in \citet[Section~2]{molnar2021general}, PFI is fundamentally a performance metric, primarily measuring the impact of feature manipulation on model loss. This focus may cause PFI to overlook features that, while not drastically affecting overall model accuracy, contribute significant variability to the model's predictions. 
+ This oversight could misalign with a nuanced understanding of feature relevance.
+In contrast, variance-based measures like those used in SHAP assess feature importance by quantifying how changes in a feature affect the model's output variability. Considering the weaknesses of (PFI), and in line with this theisis dual objective to enhance accuracy and deepen insights into the model's reliance on specific features, SHAP will be evaluated, as it promises a more detailed and accurate reflection of feature importance.
+
+\section{SHAP as model agnostic solution}
+ SHAP (SHapley Additive exPlanations), first introduced in \citet{10.5555/3295222.3295230}, is a model-agnostic method designed to assess feature importance by providing insights on both local and global scales. Distinct from permutation feature importance, SHAP allows individual predictions to be directly compared both among themselves and against the average prediction of the dataset. 
+The foundation of SHAP lies in cooperative game theory, specifically drawing upon the Shapley values, a concept developed in \citet{shapley:book1952}. Originally intended to fairly distribute payouts to players based on their contributions to the overall game, Shapley values are employed in SHAP to quantify the contribution of each feature to a prediction, effectively adapting this game theory concept to the field of machine learning. To further elucidate this theory, the next section will present an illustrative game to demonstrate the calculation of Shapley values.
+
+
+
+\subsection{Shapley values an example}
+As mentioned above, the concept of Shapley values centers on fairly distributing payouts among participants. Given that definitions of fairness can vary widely, Shapley values propose a specific approach of fairness based on four axioms, which will be outlined in section \ref{Thefouraxioms}.
+To introduce the concept of Shapley values it is useful to consider a concrete example to illustrate a coalitional game.
+One can envision a scenario in which three students, Elina, Tom, and Lucy, share an apartment. All of them enjoy watching TV, though their individual interest levels vary. Together, they subscribe to Amazon Prime. 
+Besides the fixed monthly subscription cost, they often rent movies, which adds to the final bill. This month, the total expense reaches \$50 due to these additional rentals. Faced with this cost, the trio must decide how to fairly split the bill. Even though the cost represents a negative payout, this situation aligns well with the principles of a coalitional game, since it involves determining the most equitable distribution of a shared expense among the participants. To ensure a fair distribution of costs, it's important to understand what the subscription would cost for various coalitions of students. For example, one might consider how much Elina would pay if she were living alone, or what the cost would be for Lucy and Tom if they were the only ones sharing the apartment.
+Assuming that the friends have diverse viewing habits which impact their portion of the bill, we can compile the costs for all possible coalitions in Table \ref{tab:subscription_costs}.
+To further investigate how much each student contributes to the cost of the subscription, Table \ref{tab:coalition_costs} provides the marginal contributions (MC) of each student.
+The MC of each individual is calculated as the difference between the value of a coalition including the individual and the value of the coalition without that individual. To accurately assess these contributions using Shapley values, it is necessary to consider all possible permutations of the coalition members—Elina, Tom, and Lucy. Given that there are three members, there are $ 3! = 3 \cdot2 \cdot1 = 6$ possible permutations, see \ref{sec:permutations}.
+This enumeration allows to systematically calculate the Shapley value for each individual by averaging their marginal contributions across all permutations. 
+For instance, Elina's Shapley value is calculated by averaging her contributions across all permutations: she joins first in 2 out of 6 cases, joins after Tom or Lucy individually in 1 out of 6 cases each, and joins last after both in 2 out of 6 cases. The Shapley value for Elina is computed as follows:
+$$
+\frac{1}{6} \left( 
+\underset{\text{E to } \emptyset}{2 \cdot \$30} + 
+\underset{\text{E to T}}{1 \cdot \$25} + 
+\underset{\text{Eto L}}{1 \cdot \$30} + 
+\underset{\text{E to T,L}}{2 \cdot \$25} 
+\right) = \$27.50
+$$
+Multiplication by $\frac{1}{6}$ is performed because there are six permutations, each weighted equally. Performing similar calculations for Tom and Lucy yields Shapley values of \$15.00 for Tom and \$7.50 for Lucy, (see \ref{cal:TimLucy}). The individual contributions of \$7.50, \$15.00, and \$27.50 sum to the total cost of \$50. 
+After having explored how to calculate Shapley values through the subscription cost example the Shapley value formula can now be formalized for the general case
+\begin{equation}
+ \phi_j = \sum_{S \subseteq N\backslash\{j\}} \frac{|S|!(N - |S| - 1)!}{N!}(v(S \cup \{j\}) - v(S)) .
+\end{equation}
+This equation is adapted from \citet[Section~4.4]{molnarSHAP}.
+The Shapley value $\phi_j$ is then interpreted as "[...] the weighted average of a players j marginal contribution to all possible coalitions" \citet[p.~26]{molnarSHAP}.
+The Shapley values formula was derived from four central axioms that define fariness when it comes to distribute a payout among a Team.
+
+
+\subsection{The four axioms that ensure fairness}
+\label{Thefouraxioms}
+Shapley values distinguish themselves from other methods by ensuring that payouts are distributed among players in a fair manner. Therefore, the following axioms were defined:\\
+\textbf{Efficiency}: This axioms guarantees that the individual contributions of all features sum up to the difference between the prediction for an instance $i$ and the expected prediction across the entire dataset
+$\sum_{j=1}^{N} \phi^{(i)}_j = f(x^{(i)}) - E(f(X))$\\
+\textbf{Symmetry}: This axioms states that if two features $j$ and $k$ contributed in the same way to all possible coalitions, then they should get the same Shapley values
+$
+	\text{If} \, v(S \cup \{j\})  = v(S \cup \{k\})\,
+	\text{for all coalations:} \, {S \subseteq {1,\ldots,N}\backslash\{j,k\}}\,
+	\text{then:} \,  \phi^{(i)}_j  = \phi^{(i)}_k.
+$\\
+\textbf{Dummy}: This axiom states that if a feature $j$ does not change the predicted value it needs to have a Shapley value of zero
+$
+\text{If} \, v(S \cup \{j\})  = v(S)\,
+\text{for all coalations:} \, {S \subseteq {1,\ldots,N}}\,
+\text{then:} \,  \phi^{(i)}_j  = 0.
+$\\
+\textbf{Additivity}: The last Axiom states that for any two games the Shapley value of a feature is the sum of the Shapley value of each individual prediction
+$
+	\phi^{(a)}_j + \phi^{(b)}_j = \phi^{(a+b)}_j.
+$
+The equations are adapted from \citet[Section~5.6.1]{molnarSHAP}. As defined in \citet{10.5555/3295222.3295230}, SHAP values uphold the Shapley axioms provided they satisfy three additional properties: Local Accuracy, Missingness, and Consistency.
+
+\subsection{From Shapley values to SHAP}
+The application of Shapley values to machine learning models, commonly known as SHAP, transforms the concept into a practical tool for interpretability. In this context, each feature in a model represents a "player" in a coooperative game, where the payout corresponds to the prediction output. 
+In contrast to the theoretical framework of the Shapley values where the payouts for all coalitions were predetermined, in machine learning the direct knowledge of the prediction for every feature coalition is typically unavailable. Instead, a predictive model capable of estimating outcomes based on a complete set of feature values is relied upon. The challenge then becomes how to simulate the absence of certain features to determine their individual contribution to the prediction.
+The SHAP methodology considers missing features as random variables and performs integration across their distributions.
+As outlined in \citet[Section~5.4]{molnarSHAP} the marginal contribution of a feature j is then calculated as 
+\begin{equation}
+v(S \cup j) - v(S) = \int f(x_{S \cup j}^{(i)} \cup X_{C\setminus j})dP_{X_{C\setminus j}} 
+- \int f(x_S^{(i)} \cup X_C)dP_{X_C}.
+\end{equation}
+Here $S$ contains a subset of known features and $X_C$ represents the features not included in $S$. The function $f$ denotes the model's prediction function. $X_{C\setminus j}$ is the set of absent features excluding $j$.
+SHAP calculates the change in prediction by integrating over the distribution of these 'missing' features in $X_C$, thus capturing the average marginal contribution of feature $j$ across all potential combinations of feature values. 
+The SHAP value for feature $j$ for instance $i$, denoted as $\phi^{(i)}_j$, is then calculated by weighing the contributions across all permutations, (see \ref{SHAPfunc}).
+Nevertheless, in practical machine learning applications, the unknown distributions of missing features, denoted as $X_C$ present a significant challenge. The theoretical requirement to integrate over these features for computing SHAP values becomes complicated without explicit knowledge of their distributions.
+Consequently, this lack of distributional information makes the exact computation of SHAP values impractical. Furthermore, the complexity of calculating SHAP values increases exponentially with the number of features, scaling as $2^N$ where N represents the total number of features.
+Nevertheless, SHAP values can be estimated using marginal and conditional expectations to approximate the values of missing features, see \citep[Section~4.1]{actuaries}. While marginal expectations assume independence between features, conditional expectations do not. Next, this thesis introduces two methods: Kernel SHAP, which utilizes marginal expectations, and the TreeSHAP algorithm, which employs conditional expectations to compute SHAP values.
+
+
+
+\subsection{Kernel SHAP}
+Kernel SHAP, a model agnostic method approximation for SHAP values, was the original estimation framework proposed by \cite{10.5555/3295222.3295230}.
+This technique operates through a sequence of five key steps\footnote{That can be found in section \cite[Section~9.6]{molnar2022}}, beginning with the use of a random vector to dictate whether features are present or absent in each coalition.
+For coalitions missing certain features, values are sampled randomly from the dataset, under the assumption that absent and present features are independent (Marginal expectation).
+Kernel SHAP then constructs various coalitions to serve as data points for a weighted linear regression model, with each coalition's model prediction as the target variable. The regression model computes SHAP values by fitting these weighted observations, optimizing a specific loss function to accurately determine the contribution of each feature.
+A unique aspect of Kernel SHAP is its weighting scheme that emphasizes extreme coalitions, either with many features present or absent, to isolate the effects of individual features effectively. 
+Nevertheless, the Kernel SHAP approach has fallen out of favor in many machine learning contexts, as noted in \cite{molnarSHAP}.
+This method replaces the values of missing features with values from random instances, thereby completely neglecting any underlying dependency structures between features. Such simplifications can lead to misleading results, especially in datasets where features are correlated or exhibit significant interactions.
+Therefore, Kernel SHAP shares a similar weakness with Permutation Feature Importance: it includes unlikely data instances within the sampled coalitions, which can skew the model interpretation and lead to unreliable conclusions.
+Although a method to use conditional expectations for Kernel SHAP was proposed in \cite{Aal}, the high computational time required for Kernel SHAP makes this method unpractical for applications like the one in this paper.
+Given these known weaknesses and the availability of more robust alternatives, such as TreeSHAP and SHAP permutation, Kernel SHAP will not be employed in this study.
+
+
+
+\section{TreeSHAP}
+TreeSHAP, a model specific tool introduced in \cite{lundberg2019explainable}, has been invented to navigate the intricate tree structures of random forests and gradient boosted trees. This algorithm employs conditional expectations to accurately compute SHAP values, focusing specifically on assessing the impact of features that are absent in different subsets $S$.
+In the analysis of individual trees, TreeSHAP methodically traces paths within the tree structure, examining scenarios where specific features are either included or excluded from these subsets. 
+Conditional expectations are computed by following decision paths relevant to an observation: when a feature implicated in a split is present in $S$, TreeSHAP evaluates the direct path, if absent, the algorithm calculates the weighted average from paths that diverge at the split, accounting for the absence of features.
+This procedure is applied to each possible subset $S$ of the feature values, enabling TreeSHAP to simultaneously consider all subsets. This is achieved by tracking the proportion of all possible subsets that flow into each leaf of the tree, thus handling vast combinations efficiently. For a more detailed explanation of the algorithm, see \cite[p.~23]{lundberg2019explainable}.
+Significantly, TreeSHAP reduces computational demands from exponential to polynomial time, enhancing its practicality and effectiveness for feature importance evaluation in tree-based models. Due to the additivity axiom, as defined in \ref{Thefouraxioms}, this SHAP calculation method can be applied across hundreds of trees, extending its utility and applicability.
+Moreover, TreeSHAP stands out as the only tree-specific feature importance method that provides\\ consistent SHAP values across both local and global scales, as highlighted in \cite{lundberg2019consistent}.
+However, it has been noted that TreeSHAP can sometimes assign non-zero SHAP values to features that do not directly influence the outcome. This is particularly notable when these features are correlated with those that do influence the outcome see \cite{sundararajan2020shapley}, \cite{pmlr-v108-janzing20a}. Such occurrences may appear to violate the Dummy Axiom \ref{Thefouraxioms}, which states that features not affecting the prediction should have a SHAP value of zero.
+Nevertheless it is demonstrated in \cite[p.~108]{molnarSHAP} that conditional SHAP values, those calculated by TreeSHAP using conditional distributions, do not actually violate the Dummy Axiom.
+ These values are still considered valid under the framework established by Lundberg and Lee because they are based on a modified understanding of feature contributions under conditional settings.
+Despite these nuances, some frameworks recommend caution in using TreeSHAP due to potential ambiguities in interpreting SHAP, and during the computation of the conditional expectations, see \cite{Aal}. Nevertheless, in this analysis, given the large volume of observations and the need for rapid computation alongside the decision to use a random forest model, TreeSHAP remains the chosen algorithm. The TreeSHAP explainer was firstly introduced as TreeExplainer in the Phyton package SHAP and was the afterwards extrapolated for R. In this analysis I will be using the concurrent \href{https://github.com/ModelOriented/treeshap}{TreeSHAP} package
+
+
+
+\section{Analysis}
+The real estate sector is a fundamental component of the global economy, serving both as a barometer for economic health and as a catalyst for economic growth. Fluctuations in housing prices can have extensive implications, influencing macroeconomic policy, individual investment decisions, and government housing strategies. Therefore, this thesis aims to explore the dynamics of the housing market more deeply. By applying a random forest model, it examines the California Housing dataset, which is publicly available on \href{https://www.kaggle.com/datasets/camnugent/california-housing-prices}{Kaggle} and derived from the 1990 census.
+The choice of this dataset \footnote{The exact definition and scaling of the features can be seen here: \ref{tab:variables}} is due to its blend of simplicity and complexity, offering a detailed perspective on diverse factors influencing California’s housing market, including geographic location (longitude and latitude), housing age, size (total rooms and bedrooms), occupancy (population and households), economic status (median income), property value (median house value), and proximity to the ocean.
+
+
+
+\subsection{Feature Engineering}
+The initial analysis of the dataset revealed 207 missing entries in the total bedrooms feature. Given the sufficiently large size of the dataset, these records will be excluded from the analysis. In data preparation, special attention was given to the categorical variable ocean proximity. To facilitate the analysis, it was transformed using one-hot encoding, which generated distinct binary indicators for each category. This approach not only aids in model interpretability but also enhances the application of SHAP and Permutation Feature Importance, offering clearer insights into each category’s impact on model predictions.
+Figure \ref{fig:oceanprox} offers valuable insights into the distribution of the categories of the ocean proximity feature.
+The barplot clearly indicates a significant preference for residences located less than one hour from the ocean, boasting the highest number of observations at 9,034. Following that, Inland regions account for 6,496 observations, suggesting a notable but lesser concentration of properties. Interestingly, the category 'Island' has an extremely low presence in the dataset. Overall, the data depicts a discernible inclination towards ocean-adjacent living, compared to inland areas.
+
+\subsection{Descriptives}
+To analyze the distributions and frequencies of the nine numerical variables, histograms were used. 
+These histograms, shown in Figure \ref{fig:distributions} clearly reveal a pronounced right skew in several variables, such as total rooms, total bedrooms, population, households, and median income indicating a large concentration of lower values with a long tail of higher values. 
+The target feature, median house value, also exhibits a right skew but with a notable cluster of high-value properties, suggesting the presence of a luxury housing segment.
+Additionally, the distribution of housing median age shows a collection of very old houses, which may represent historical or less-renovated properties.
+Moreover, the histograms for longitude and latitude reveal concentrated bands of high frequency, reflecting the geographical clustering of properties and possibly indicating areas of higher population density or urban development.
+A detailed visualization of the house locations can be explored interactively using R.
+In light of the skewed distributions and the presence of outliers within the dataset, Spearman's rank correlation coefficient was utilized to assess the relationships between variables. This non-parametric measure is more suitable for the analysis as it can capture monotonic relationships without the assumption of linearity, providing a more robust understanding of the underlying associations in preparation for Random Forest modeling.
+The correlation matrix \ref{fig:corr_one} indicates several strong relationships among the variables. Longitude and latitude have a very high negative correlation, suggesting that as we move in one geographic direction, there’s a corresponding and predictable move in the other, likely tracing a geographic contour such as coastlines. High positive correlations are observed among total rooms, total bedrooms, population, and households, indicating that these variables increase together, which is expected as larger dwellings can typically accommodate more people.
+Notably, median income shows a \textbf{significant} positive correlation with our target feature median house value, reinforcing the economic principle that higher income levels are associated with more expensive housing. 
+In addressing multicollinearity, the study introduces feature engineering to create new variables to mitigate the high correlations observed among total rooms, total bedrooms, population, and households which could complicate the SHAP interpretation and the calculation of Permutation Feature Importance as mentioned in \cite[Section~11]{molnarSHAP}.
+As it can been seen in Figure \ref{fig:corr_two} creating new features, population per household, bedrooms per household, and rooms per household, has caused a significant reduction in the correlations. Notably, the correlation between the original room-related variables and the household size has diminished, aligning the dataset for a more nuanced analysis and interpretation in later stages.
+Notably we still encounter a correlation between our target feature (house values) and the median income feature. Moreover, the emergent correlation (0.64) between mean rooms and median income could be indicative of an underlying pattern where higher income areas tend to have houses with more rooms, reflecting socio-economic factors influencing housing characteristics. This could suggests that  income serves not only as an indicator for the economic status of the inhabitants but also aligns with larger living spaces.
+
+\subsection{Random Forest model }
+Following feature engineering, a random forest model was implemented using the  \href{https://www.rdocumentation.org/packages/ranger/versions/0.16.0/topics/ranger}{ranger} function to predict median house values and evaluate the features' relative importance. 
+Therefore, the dataset was divided into training and testing sets through a randomized sampling method, allocating 70\% of the data to training and 30\% to testing. This division not only supports model validation but also mirrors common practice in predictive modeling to assess model generalizability.
+To tune this model, the following hyperparameters were set:
+The maximum tree depth was set to 4 to ensure simpler decission paths.
+Next, mtry, which corresponds to the number of variables considered at each split, was set at 4. It adheres to the guideline proposed by \citet{article}, which recommends setting mtry to the square root of the total number of features ($\text{mtry}=\sqrt{n}$).
+Moreover, for the model, 500 trees were chosen. This decision is based on the principle that although increasing the number of trees generally enhances model performance, there comes a point where the gains in accuracy become marginal and do not justify the additional computational costs.
+The model performance metrics in Table \ref{tab:model_metrics} provides several key insights into its predictive accuracy.
+The out-of-bag prediction error, measured as mean squared error (MSE), stands at approximately 4,806,113,672, highlighting the challenges associated with the target variable's large scale.
+Despite this, the model achieved an out-of-bag $R^2$ of 0.644, which is a commendable result, given the complexity of predicting real estate prices, which are influenced by a range of economic and locational factors. The robust $R^2$ value demonstrates the model's strong capability to capture significant patterns in the data.
+The analysis of permutation feature importance visible in Figure \ref{fig:pfi} has revealed several critical determinants of housing prices.
+Median income emerged as the most significant predictor, underscoring the profound influence of economic factors on housing values.
+In addition, inland (a category of OceanProximity) along with mean rooms, and mean population also demonstrated strong influences, suggesting that location and average household size are critical in determining house prices. 
+Longitude and latitude were found to have moderate importance. This indicates that while broader geographic locations do influence housing prices, their impact is somewhat secondary compared to more localized economic and binary locational factors.
+Surprisingly, the island category of ocean proximity showed no significant influence. This might be attributed to the scarcity of data points for this category (5) or its relative irrelevance when compared to other, more dominant factors. 
+Overall, these results affirm that economic conditions, particularly median income, and specific geographic locales are key drivers of housing prices. 
+The Random Forest model's performance on the unseen test data, see Table \ref{tab:model_metrics}, shows a mean squared error (MSE) of approximately 4,631,007,012 and a root mean squared error (RMSE) of 68,051.5. This points to a reasonable level of effectiveness, though there is clearly room for improvement.
+To improve model accuracy and address shortcomings, the TreeSHAP algorithm will be used to analyze the impact of each feature on the predictions. By comparing the results with permutation feature importance, one can pinpoint and potentially remove less influential features. This strategy aims to streamline the model, removing noisy features, and enhance prediction accuracy.
+
+
+\section{SHAP}
+\subsection{Local explanations}
+Local explanations offer a detailed breakdown of individual prediction contributions.
+To move beyond simply listing SHAP values, we will employ a visualization technique known as the waterfall plot, that illustrates the contribution of each feature to a particular prediction, relative to the baseline prediction.
+The waterfall plot (Figure \ref{fig:origwaterfall}) reveals that the specific prediction for the third instance of the test set is 269,057, compared to the average model prediction of 207,347. This indicates that the unique feature values in this instance contribute to an increase in house prices by 61,710\$.
+ Features such as non-inland location, mean population, and longitude have positively influenced the predicted price, while features like mean rooms have had a negative impact. 
+Specifically, properties that are not located inland (indicated by an inland value of 0) experience an increase in predicted house value by 27,160\$ compared to the average. This could suggest that for this instance non-inland regions may be closer to coastal areas, which are more desirable.
+Additionally, a below-average population of 2.14 increases the prediction by 18,707\%.
+Interestingly, a lower then usal average number of rooms, at 4.76\$, results in a decrease in  the predicted value by 6,164. This particular case clearly illustrates the premium on coastal proximity and the value of quieter living conditions, reflected by a lower population density.
+On the other hand, the SHAP waterfall plot for another instance (test instance 11), see Figure \ref{fig:waterfall}, showcases a different scenario. Here, the unique feature values increased house prices by 17,384\$ relative to the average. 
+Again, features like the non-inland location, mean population, and housing age were significant positive contributors. Specifically, a high housing age of 52, the maximum in this range, notably increased the house value. 
+However, for this instance, income negatively impacted house values. A below-average mean income of 1.41 decreased the house value significantly by 37,938\$. Hence, for this instance, older houses in potentially non-inland coastal regions could drive up house prices, while the lower-than-average income reduces them. To examine the broader influence of features across all instances, this paper will also employ SHAP on a global scale.
+
+\subsection{SHAP global feature importance}
+	Alongside local interpretability, SHAP also provides a method for global interpretability by averaging the absolute SHAP values across all predictions, as detailed in \citet[Section~7.9]{molnarSHAP}:$
+	I_j = \frac{1}{n} \sum_{i=1}^{n} \phi^{(i)}_{j}$. This approach yields a global importance plot (see Figure \ref{fig:shapimp}) that, while showing many similarities in determining feature significance, also reveals critical distinctions when compared to PFI as shown in Figure \ref{fig:pfi}. While PFI identifies income as the predominant factor influencing house prices, SHAP analysis places the binary indicator inland as the most significant influencer of predictions. This discrepancy highlights the substantial role that location-specific characteristics play in property valuation, potentially more impactful than previously understood through PFI alone.
+The prominence of inland in SHAP's results is further evidenced by the waterfall plot shown in Figure \ref{fig:origwaterfall}, which underscores the significant impact of geographic distinctions, specifically between inland and coastal areas, on housing values. 
+Furtheremore, differences between the methods become apparent in the evaluation of broader location features, such as longitude and latitude, and the binary feature indicating proximity to the ocean (less than one hour away). Yet still underscoring the importance of location based features.
+These discrepancies suggest that while overall geographical factors are recognized by both methods, their relative importance varies, potentially due to the way each method quantifies the impact on the model’s predictive accuracy.
+In terms of the least influential features, there is a consensus between the SHAP importance plot and the permutation feature importance plot, with both identifying the same features in the same order.
+To gain further insights into feature relevance, the study now examines the beeswarm plot (Figure \ref{fig:shapbee}).
+This plot offers deeper insights than standard feature importance plots by providing a detailed view of each feature's impact, highlighting how the influence varies with different feature values. For instance, the inland feature displays a significant cluster of negative SHAP values, indicating that non-inland properties, that might be closer to the coast are highly valued, substantially increasing house prices.
+On the other hand,  the median income feature demonstrates that higher income levels correspond to large SHAP values, indicating that greater incomes generally lead to predictions of higher house prices.
+For features like mean rooms and mean population, the mixture of positive and negative SHAP values, coupled with the absence of a clear color gradient, complicates the assessment of how high or low values of these features influence SHAP values.
+This complexity invites further exploration through SHAP dependence plots to better understand relationships and interactions. 
+Longitude and latitude have location-specific effects on house prices, with SHAP values showing both positive and negative influences. Generally, higher latitudes and longitudes, often associated with more inland locations in the northeast, tend to correspond with negative SHAP values.
+Features such as nearBay, mean bedrooms, households, and island exhibit clusters of SHAP values close to zero, reflecting a smaller or less consistent impact on house price predictions.
+Given the observed variability in feature impacts as demonstrated, SHAP dependence plots become an essential analytical tool. They provide a clearer visualization of how feature values interact with other features to influence predictions, revealing the underlying complexities and dependencies within the data.
+
+
+
+
+\subsection{SHAP dependence plots}
+Following the insights from the SHAP beeswarm plot, median income and mean rooms were chosen for a deeper investigation of their interactions with other features. The SHAP dependence plot for median income, see Figure \ref{fig:depincome}, reveals distinct interaction effects with the binary inland feature.
+For low to mid-range income levels (0-3 on x-axis), houses in inland regions exhibit markedly higher SHAP values compared to non-inland located houses, suggesting that in these income brackets, inland location significantly boosts housing values.
+At a moderate income level, SHAP values for both inland and non-inland houses converge, indicating a similar impact of income on house values across regions.
+For high income levels, despite a larger proportion of high-income instances in non-inland areas, inland properties at this income level again show positive SHAP values, whereas non-inland properties display negative ones. This suggests that living inland may enhance housing prices even at higher income levels, in contrast to non-inland, maybe coastal areas.
+Notably, at both lower and higher income levels, being inland tends to increase house values more substantially than being in non-inland regions. 
+The SHAP dependence plot for the mean rooms feature, see Figure \ref{fig:deproom}, demonstrates discernible interactions with the inland feature. Particularly notable is the behavior observed in the range of 5 to 7 rooms. In this range, SHAP values for non-inland houses are generally positive and tend to increase as the number of rooms grows. Conversely, inland houses exhibit predominantly negative SHAP values in comparison to their non-inland counterparts, especially within this specific room count range. This suggests that properties with an average of 5 to 7 rooms situated in non-inland areas may command higher housing prices compared to similar homes in inland locations.
+Having analyzed the feature importance and identified critical factors affecting house prices through the SHAP framework, this thesis will now focus on enhancing the model's predictive accuracy. The next phase involves removing less impactful features to streamline the model, and improve performance.
+
+\subsection{Improve model}
+After a detailed examination of the global feature importance plot, a decision was made to refine the model by removing features that contribute minimally to predictive accuracy. 
+Specifically, the features island, households, mean bedrooms, nearBay, and nearOcean were removed based on their low SHAP values. This strategic removal led to the creation of a more streamlined model with a reduced set of variables. 
+The refined model, see Table \ref{tab:model_metrics2}, which now operates with only eight independent variables, exhibits a notable improvement in performance metrics. The out-of-bag prediction error (MSE) decreased from approximately 4,806,113,672 to 4,445,647,613, and the out-of-bag $R^2$ increased from 0.644 to approximately 0.671. These improvements indicate a more efficient model that retains a high degree of predictive accuracy while being less complex and potentially more robust against overfitting.
+The performance of the new model was evaluated on an unseen test set to assess changes in predictive accuracy. The results indicate that the revised model, which utilizes fewer features, achieved a mean squared error (MSE) of 4,311,569,541 and a root mean squared error (RMSE) of 65,662.54. This compares favorably to the previous model, which included all features and recorded an MSE of approximately 4,631,007,012 and an RMSE of 68,051.5.
+The reduction in MSE and RMSE for the streamlined model indicates that removing non-critical features, guided by SHAP analysis, has simplified the model and improved its accuracy. This likely shows better generalization from training to test data. The SHAP analysis effectively identified less important variables, validating its use in enhancing model efficiency and predictive reliability for house prices.
+
+\section{Disscussion}
+The incorporation of SHAP plots has markedly enhanced the interpretability of the random forest model by offering advanced visualization tools that reveal more detailed information about feature importance compared to traditional PFI plots. Notably, the SHAP waterfall plot is particularly effective in providing localized insights. Both PFI and SHAP, as implemented by TreeSHAP, consistently identify the least important features in the same order, thereby aiding in prediction accuracy. However, while SHAP struggles with conditional expectations and PFI faces challenges with feature correlations, there remains considerable scope for research to develop robust methodologies tailored for tree-based models like random forests, especially for large datasets.
+
+
+
+\newpage
+\section{Figures and Tables}
+
+\subsection{Table 1: Subscription costs}
+In the provided example, we analyze the subscription costs associated with different coalitions of students who share an Amazon Prime subscription. Each coalition represents a group of students with varying watching habits, which influence the total cost of the subscription. The symbol $\emptyset$ represents an empty coalition, indicating that no subscription has been made, and therefore, there are no costs.
+\begin{table}[H]
+	\centering
+	\caption{Subscription costs}
+	\begin{tabular}{lll}
+		\toprule
+		Coalition & Cost & Explanation \\
+		\midrule
+		$\emptyset$ & \$0 & No subscription, no costs. \\
+		\{Elina\} & \$30 & High costs from daily movie rentals. \\
+		\{Tom\} & \$20 & Lower costs, primarily weekend watching. \\
+		\{Lucy\} & \$10 & Minimal costs, watches documentaries occasionally. \\
+		\{Elina, Tom\} & \$45 & Increased costs from both's frequent viewing. \\
+		\{Elina, Lucy\} & \$40 & Costs moderated by mixed viewing habits. \\
+		\{Tom, Lucy\} & \$25 & Moderate costs from their less frequent usage. \\
+		\{Elina, Tom, Lucy\} & \$50 & Total cost reflects full usage by all. \\
+		\bottomrule
+	\end{tabular}%
+	\label{tab:subscription_costs}%
+\end{table}%
+
+\newpage
+\subsection{Table 2 : Marginal contributions}
+This table illustrates the marginal contributions of different members when joining various coalitions under an Amazon Prime subscription plan. Marginal contribution is defined as the difference in cost before and after a member joins the coalition, highlighting the financial impact of each user's addition. 
+\begin{table}[H]
+	\centering
+	\caption{Coalition Costs and Marginal Contributions (MC)}
+	\begin{tabular}{lllll}
+		\toprule
+		Coalition Before Joining & Joining Member & Cost Before & Cost After Joining & MC \\
+		\midrule
+		$\emptyset$ & Elina & \$0 & \$30 & \$30 \\
+		$\emptyset$ & Tom & \$0 & \$20 & \$20 \\
+		$\emptyset$ & Lucy & \$0 & \$10 & \$10 \\
+		\{Elina\} & Tom & \$30 & \$45 & \$15 \\
+		\{Elina\} & Lucy & \$30 & \$40 & \$10 \\
+		\{Tom\} & Elina & \$20 & \$45 & \$25 \\
+		\{Tom\} & Lucy & \$20 & \$25 & \$5 \\
+		\{Lucy\} & Elina & \$10 & \$40 & \$30 \\
+		\{Lucy\} & Tom & \$10 & \$25 & \$15 \\
+		\{Elina, Tom\} & Lucy & \$45 & \$50 & \$5 \\
+		\{Elina, Lucy\} & Tom & \$40 & \$50 & \$10 \\
+		\{Tom, Lucy\} & Elina & \$25 & \$50 & \$25 \\
+		\bottomrule
+	\end{tabular}%
+	\label{tab:coalition_costs}%
+\end{table}%
+
+
+
+\subsection{Table 3 : Variables Used}
+\begin{table}[H] % 'ht' tries to place it here or at the top of the page
+	\centering
+	\begin{tabular}{ll}
+		\toprule
+		\textbf{Variable Name} & \textbf{Description} \\
+		\midrule
+		Longitude & Geographic coordinate defining the westward measure \\
+		Latitude & Geographic coordinate defining the northward measure \\
+		HousingMedianAge & Median age of homes in a district \\
+		TotalRooms & Aggregate number of rooms in homes \\
+		TotalBedrooms & Aggregate number of bedrooms in homes \\
+		Population & Total population in a district \\
+		Households & Total households in a district \\
+		MedianIncome & Median household income (in \$10,000 units) \\
+		MedianHouseValue & Median value of homes (in USD) \\
+		OceanProximity & Proximity of homes to the ocean \\
+		\bottomrule
+	\end{tabular}
+	\caption{Description of Variables in the California Housing Dataset}
+	\label{tab:variables}
+\end{table}
+The variables listed in the above table are derived from the California Housing Dataset, each capturing specific characteristics of housing and demographic metrics at the block group level. 
+Block groups are defined as the smallest geographic divisions for which the U.S. Census Bureau releases sample data, generally housing between 600 and 3,000 residents. This granularity allows for detailed analysis and insights into the housing conditions and socio-economic environment across different communities within California.
+
+
+\subsection{Figure 1 : The Ocean Proximity variable}
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.8\textwidth]{ocean_prox.png}
+	\caption{Frequency of Categories in Ocean Proximity}
+	\label{fig:oceanprox}
+\end{figure}
+
+
+\subsection{Figure 2 : Feature Distributions}
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.8\textwidth]{distributions_num.png}
+	\caption{Frequency of Categories in Ocean Proximity}
+	\label{fig:distributions}
+\end{figure}
+
+
+\subsection{Matrix 3 : Spearman correlations}
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=1\textwidth]{spearman_one.png}
+	\caption{Spearman correlations between numercial variables}
+	\label{fig:corr_one}
+\end{figure}
+In the exploration of the dataset, a Spearman rank-order correlation was conducted to assess the monotonic relationships between the variables related to housing infrastructure and demographics within the California housing market dataset. The analysis yielded high correaltions specially between four variables that can be interpreted as follows: The strong correlation (r = 0.92) between the number of total rooms and total bedrooms is indicative of the proportionate increase in living spaces relative to sleeping quarters, underscoring bedrooms as a substantial component of residential room count. The observed high correlations between total rooms and households (r = 0.91), as well as between total bedrooms and households (r = 0.98), reflect a dense aggregation of residential structures in response to the increased number of households, characteristic of urbanized regions. A notable positive correlation (r = 0.90) between population size and the number of households elucidates the demographic trend where larger populations are constituted by a higher count of individual household units. Correlations between population and both total rooms (r = 0.82) and total bedrooms (r = 0.87) highlight the direct impact of population growth on the demand for residential space, which translates into a greater number of rooms and bedrooms to accommodate the increased populace.
+
+
+
+
+\subsection{Figure 4 : Reduced correlation}
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=1\textwidth]{spearman_two.png}
+	\caption{Spearmann correlations after feature engineering}
+	\label{fig:corr_two}
+\end{figure}
+In my feature engineering step, I've created new variables that represent per-household measures: mean population, mean bedrooms, and mean rooms per household. These are individualized metrics that normalize the absolute numbers by the number of households, which provides a more comparable basis across different geographical areas.
+
+
+\subsection{Figure 5 : Permutation Feature Importance}
+ The y-axis lists the features used in the model, ordered to highlight their influence on model performance when permuted. The x-axis quantifies the increase in model loss resulting from the permutation of each feature. This increase in loss indicates the importance of a feature; the greater the loss, the more crucial the feature is to the model's predictive accuracy.
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.7\textwidth]{Pfi.png}
+	\caption{Feature importance after PFI}
+	\label{fig:pfi}
+\end{figure}
+
+\subsection{Table 4: Model output}
+\begin{table}[h]
+	\centering
+	\begin{tabular}{|l|l|}
+		\hline
+		\textbf{Parameter} & \textbf{Value} \\ \hline
+		Type of Model & Regression \\ \hline
+		Number of Trees & 500 \\ \hline
+		Sample Size & 14303 \\ \hline
+		Number of Features & 13 \\ \hline
+		Mtry & 4 \\ \hline
+		Target Node Size & 5 \\ \hline
+		Variable Importance Mode & Permutation \\ \hline
+		Split Rule & Variance \\ \hline
+		OOB MSE & 4806113672 \\ \hline
+		R Squared (OOB) & 0.6444524 \\ \hline
+		Test Set Prediction & 68051.5 \\ \hline
+		Test Set MSE & 4631007012 \\ \hline
+	\end{tabular}
+	\caption{Summary of Random Forest Model Metrics}
+	\label{tab:model_metrics}
+\end{table}
+
+\newpage
+\subsection{Figure 6 \& 7: SHAP waterfall plot}
+It is crucial to note that R supports two distinct variations of waterfall plots, each visualizing the contribution of features differently. The first type, implemented in the \href{https://github.com/ModelOriented/treeshap}{TreeSHAP} package, begins with the average model prediction. It then sequentially adds the effect of each feature to illustrate how they collectively build up to the final prediction for a specific instance  (see \ref{fig:origwaterfall})
+In contrast, the second type, offered by the  \href{https://github.com/ModelOriented/shapviz}{shapviz} package, starts with the average prediction set at zero. This plot method cumulatively adds the impact of each feature, demonstrating how they contribute to the deviation from the average prediction to the actual prediction for an instance (see \ref{fig:waterfall}).\\
+\textbf{Waterfallplot produced by the shapviz package:}
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=1\textwidth]{waterfallrealone.png}
+	\caption{Waterfall plot for test instance 3}
+	\label{fig:origwaterfall}
+\end{figure}
+In the waterfall plot, SHAP values represent the contribution of each feature to the model's prediction for a specific instance, relative to a baseline prediction. The baseline is typically the average prediction across the dataset, a concept derived from the Efficiency Axiom (see \ref{Thefouraxioms}). SHAP values can be positive or negative: positive SHAP values indicate that a feature has increased the prediction relative to the baseline, while negative values suggest a decrease. This demonstrates how individual features push the prediction higher or lower, starting from the baseline. On the plot, the y-axis lists all the predictor features used in the model, and the x-axis represents the corresponding SHAP values, clearly illustrating the influence of each feature on the prediction.\\
+\textbf{Waterfall plot with the original package:}
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=1\textwidth]{waterfalltwo.png}
+	\caption{Waterfall plot for test instance 11}
+	\label{fig:waterfall}
+\end{figure}
+
+\newpage
+\subsection{Figure 8 : Feature Importance for SHAP}
+On this plot, the x-axis displays the SHAP values, measured in mean absolute SHAP values, which quantitatively represent the magnitude of each feature's influence on the prediction. The y-axis ranks the features according to their importance, determined by the aggregate impact of their SHAP values across all instances.
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=1\textwidth]{importance.png}
+	\caption{SHAP feature importance plot}
+	\label{fig:shapimp}
+\end{figure}
+
+\newpage
+\subsection{Figure 9 : Beeswarm plot}
+The beeswarm plot arranges features on the y-axis by importance and SHAP values on the x-axis to show their impact on model predictions. Points represent individual SHAP values: right-side positions indicate positive effects increasing predictions; left-side, negative effects decreasing them. Colors of the points may vary to represent additional data dimensions, providing deeper insight into the data distribution and feature behavior.
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=1\textwidth]{importance_bee.png}
+	\caption{Beeswarm plot}
+	\label{fig:shapbee}
+\end{figure}
+Here each dot is displayed as the SHAP value of a feature for a specific datapoint. 
+
+\newpage
+
+\subsection{Figure 10 : SHAP dependence plot median income}
+The plot for the median income variable
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=1\textwidth]{dependence_income.png}
+	\caption{SHAP dependence plot for median income}
+	\label{fig:depincome}
+\end{figure}
+The SHAP dependence plot for median income illustrates the impact of the 'median income' feature on the predicted 'median house value'. The x-axis represents 'median income', while the y-axis shows SHAP values, quantifying its effect on house value predictions. The plot's color gradient from purple to yellow represents the binary 'inland' feature, with purple indicating '0' (not inland) and yellow indicating '1' (inland). This indicates how the effect of median income on house values varies with the inland location of housing blocks.
+
+\newpage
+
+\subsection{Figure 11 : SHAP dependence plot mean rooms}
+For the mean rooms variable
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=1\textwidth]{dependence_rooms.png}
+	\caption{SHAP dependence plots for mean rooms}
+	\label{fig:deproom}
+\end{figure}
+The SHAP dependence plot for mean rooms showcases the relationship between the 'mean rooms' feature and its influence on the predicted 'median house value'. The x-axis shows 'mean rooms', while the y-axis represents the SHAP values, detailing its impact on house value predictions.
+ The plot again uses a color gradient from purple to yellow to indicate the binary 'inland' feature—purple for '0' (not inland) and yellow for '1' (inland). 
+ This color coding highlights the differential effect of the number of rooms on house values depending on the inland status of housing blocks. 
+ 
+
+
+\subsection{Table 5: Model output second model}
+\begin{table}[h]
+	\centering
+	\begin{tabular}{|l|l|}
+		\hline
+		\textbf{Parameter} & \textbf{Value} \\ \hline
+		Type of Model & Regression \\ \hline
+		Number of Trees & 500 \\ \hline
+		Sample Size & 14303 \\ \hline
+		Number of Features & 8 \\ \hline
+		Mtry & 4 \\ \hline
+		Target Node Size & 5 \\ \hline
+		Variable Importance Mode & Permutation \\ \hline
+		Split Rule & Variance \\ \hline
+		OOB MSE & 4445647613\\ \hline
+		R Squared (OOB) & 0.6711191 \\ \hline
+		Test Set Prediction & 65662.54 \\ \hline
+		Test Set MSE & 4311569541 \\ \hline
+	\end{tabular}
+	\caption{Summary of refined Random Forest Model Metrics}
+	\label{tab:model_metrics2}
+\end{table}
+
+\newpage
+\section{Appendix} % The asterisk omits section numbering
+
+\subsection{Model complexity vs Model interpretability}
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.8\textwidth]{compint.png}
+	\caption{Model complexity vs interpretability Source: Adapted from \href{https://ambiata.com/blog/2021-04-12-xai-part-1/}{AMBIATA}.}
+	\label{fig:compin}
+\end{figure}
+The graph illustrates the trade-off between model interpretability and complexity across various machine learning methods. Simple models like ordinary linear models are highly interpretable but offer limited performance potential. As we progress to more complex models such as random forests and neural networks, their ability to handle intricate patterns and achieve higher accuracy increases, yet this comes at the cost of reduced interpretability, complicating their use in scenarios where understanding model decisions is crucial.
+
+
+
+\subsection{SHAP function}
+\label{SHAPfunc}
+$$	\phi^{i}_j = \sum_{S \subseteq {1,\ldots,N}\backslash\{j\}} \frac{|S|!(N - |S| - 1)!}{N!} * ( \int f(x_{S \cup j}^{(i)} \cup X_{C\setminus j})dP_{X_{C\setminus j}} \\
+- \int f(x_S^{(i)} \cup X_C)dP_{X_C})$$ 
+This equation is adapted from \cite[Section~5.5]{molnarSHAP}.
+ The formula calculates the expected change in the model's output when feature j is added to any subset S of features, integrating over the distributions of the remaining features in $X_C$. 
+
+
+
+
+
+
+
+\subsection{Possible permutations}
+\label{sec:permutations}
+\begin{itemize}
+	\item Elina, Tom, Lucy
+	\item Elina, Lucy, Tom
+	\item Tom, Elina, Lucy
+	\item Tom, Lucy, Elina
+	\item Lucy, Tom, Elina
+	\item Lucy, Elina, Tom
+\end{itemize}
+
+\subsection{Shapley values for Tom and Lucy}
+\label{cal:TimLucy}
+For Tom:
+\begin{equation}
+	\frac{1}{6} \left( 
+	\underset{\text{T to } \emptyset}{2 \cdot \$20} + 
+	\underset{\text{T to E}}{1 \cdot \$15} + 
+	\underset{\text{Tto L}}{1 \cdot \$15} + 
+	\underset{\text{T to E,L}}{2 \cdot \$10} 
+	\right) = \$15
+	\label{eq:tom_shapley}
+\end{equation}
+And for Lucy:
+\begin{equation}
+	\frac{1}{6} \left( 
+	\underset{\text{L to } \emptyset}{2 \cdot \$10} + 
+	\underset{\text{L to E}}{1 \cdot \$10} + 
+	\underset{\text{Lto T}}{1 \cdot \$5} + 
+	\underset{\text{L to E,T}}{2 \cdot \$5} 
+	\right) = \$7.50
+	\label{eq:lucy_shapley}
+\end{equation}
+
+\newpage
+
+
+%\bibliographystyle{abbrvnat} %plain, natbib and so on unsrtnat
+%apalike, plainnat
+\bibliographystyle{plainnat}
+\bibliography{referenzen}
+\end{document}
